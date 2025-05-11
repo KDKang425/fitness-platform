@@ -14,6 +14,8 @@ const dataSourceOptions: DataSourceOptions = {
   entities: [__dirname + '/src/**/*.entity.{ts,js}'],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,
+  migrationsRun: false,
+  logging: process.env.NODE_ENV !== 'production',
 };
 
 export const AppDataSource = new DataSource(dataSourceOptions);

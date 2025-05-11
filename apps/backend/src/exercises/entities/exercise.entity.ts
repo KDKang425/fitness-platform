@@ -1,5 +1,30 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
+export enum MuscleGroup {
+  CHEST        = 'CHEST',
+  BACK         = 'BACK',
+  SHOULDER     = 'SHOULDER',
+  TRICEPS      = 'TRICEPS',
+  BICEPS       = 'BICEPS',
+  FOREARM      = 'FOREARM',
+  ABS          = 'ABS',
+  GLUTES       = 'GLUTES',
+  HAMSTRING    = 'HAMSTRING',
+  QUADRICEPS   = 'QUADRICEPS',
+  TRAPS        = 'TRAPS',
+  CALVES       = 'CALVES',
+}
+
+export enum ExerciseModality {
+  CARDIO        = 'CARDIO',
+  BARBELL       = 'BARBELL',
+  DUMBBELL      = 'DUMBBELL',
+  BODYWEIGHT    = 'BODYWEIGHT',
+  MACHINE       = 'MACHINE',
+  CABLE         = 'CABLE',
+  SMITH_MACHINE = 'SMITH_MACHINE',
+}
+
 @Entity('exercises')
 export class Exercise {
   @PrimaryGeneratedColumn()
@@ -28,4 +53,10 @@ export class Exercise {
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   updated_at: Date;
+
+  @Column({ type: 'enum', enum: MuscleGroup })
+  category: MuscleGroup;
+
+  @Column({ type: 'enum', enum: ExerciseModality })
+  modality: ExerciseModality;
 }
