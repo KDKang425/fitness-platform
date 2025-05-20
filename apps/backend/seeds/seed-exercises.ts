@@ -1,10 +1,10 @@
 import 'reflect-metadata';
-import dataSource from '../../data-source';        
+import dataSource from '../data-source';            
 import {
   Exercise,
   MuscleGroup,
   ExerciseModality,
-} from '../exercises/entities/exercise.entity';
+} from '../src/exercises/entities/exercise.entity';
 
 async function run() {
   await dataSource.initialize();

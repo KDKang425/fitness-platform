@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+
 import { Routine } from './entities/routine.entity';
 import { RoutineExercise } from './entities/routine-exercise.entity';
 import { CreateRoutineDto } from './dto/create-routine.dto';
@@ -18,29 +19,43 @@ export class RoutinesService {
     const routine = this.routineRepo.create({
       name: dto.name,
       description: dto.description,
-      is_public: dto.is_public ?? true,
-      // creatorId 등은 dto로 받거나, JWT 토큰 정보로 설정
+      isPublic: dto.isPublic ?? true,
     });
-    await this.routineRepo.save(routine);
+    const savedRoutine = await this.routineRepo.save(routine);
 
-    if (dto.exercises) {
-      const exList = dto.exercises.map(ex => this.routineExerciseRepo.create({
-        routine,
-        exercise: { id: ex.exerciseId } as any, // exercise_id
-        default_sets: ex.defaultSets,
-        default_reps: ex.defaultReps,
-      }));
-      await this.routineExerciseRepo.save(exList);
+    if (dto.exercises?.length) {
+      const routineExercises: RoutineExercise[] = dto.exercises.map((ex) =>
+        this.routineExerciseRepo.create({
+          routine: savedRoutine,
+          exercise: { id: ex.exerciseId } as any,
+          exerciseOrder: ex.exerciseOrder ?? 1,     
+          defaultSets: ex.defaultSets ?? 3,
+          defaultReps: ex.defaultReps ?? 8,
+          ...(ex.defaultWeight !== undefined
+            ? { defaultWeight: ex.defaultWeight }
+            : {}),
+        }),
+      );
+
+      await this.routineExerciseRepo.save(routineExercises);
     }
 
-    return routine;
+    return savedRoutine;
   }
 
-  async findRoutine(id: number) {
-    return this.routineRepo.findOne({ where: { id }});
+  findRoutine(id: number) {
+    return this.routineRepo.findOne({
+      where: { id },
+      relations: [
+        'routineExercises',
+        'routineExercises.exercise',
+      ],
+    });
   }
 
-  async findAllRoutines() {
-    return this.routineRepo.find();
+  findAllRoutines() {
+    return this.routineRepo.find({
+      relations: ['routineExercises'],
+    });
   }
 }
