@@ -1,13 +1,12 @@
-version: '3'
 
 services:
   backend:
-    build: ./apps/backend
-
+    build:
+      context: .                                 
+      dockerfile: apps/backend/Dockerfile.dev    
     volumes:
-      - ./apps/backend:/app           
-      - /app/node_modules             
-
+      - ./apps/backend:/app                      
+      - /app/node_modules                       
     ports:
       - "3001:3001"
     env_file:
@@ -17,9 +16,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    
-    command: npm run start:dev       
-
+    command: npm run start:dev                   
 
   postgres:
     image: postgres:latest
@@ -37,7 +34,8 @@ services:
 
   redis:
     image: redis:latest
-    ports: ['6379:6379']
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
