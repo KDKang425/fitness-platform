@@ -10,6 +10,7 @@ import { BodyRecordsModule } from './body-records/body-records.module';
 import { PostsModule } from './posts/posts.module';
 import { ExercisesModule } from './exercises/exercises.module';
 import { AuthModule } from './auth/auth.module';
+import { StatsModule } from './stats/stats.module';
 
 @Module({
   imports: [
@@ -42,6 +43,8 @@ import { AuthModule } from './auth/auth.module';
         ExercisesModule,
 
         AuthModule,
+
+        StatsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
