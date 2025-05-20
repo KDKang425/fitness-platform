@@ -1,11 +1,15 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+// src/posts/dto/create-post.dto.ts
+import { IsInt, IsOptional, IsString } from 'class-validator';
+import { Expose } from 'class-transformer';
 
 export class CreatePostDto {
-  @IsNumber()
+  @IsInt()
+  @Expose({ name: 'user_id' })
   userId: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Expose({ name: 'workout_session_id' })
   workoutSessionId?: number;
 
   @IsOptional()
@@ -14,5 +18,6 @@ export class CreatePostDto {
 
   @IsOptional()
   @IsString()
-  image_url?: string;
+  @Expose({ name: 'image_url' })
+  imageUrl?: string;
 }

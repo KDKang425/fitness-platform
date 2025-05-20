@@ -1,62 +1,73 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+  Unique,
+} from 'typeorm';
 
 export enum MuscleGroup {
-  CHEST        = 'CHEST',
-  BACK         = 'BACK',
-  SHOULDER     = 'SHOULDER',
-  TRICEPS      = 'TRICEPS',
-  BICEPS       = 'BICEPS',
-  FOREARM      = 'FOREARM',
-  ABS          = 'ABS',
-  GLUTES       = 'GLUTES',
-  HAMSTRING    = 'HAMSTRING',
-  QUADRICEPS   = 'QUADRICEPS',
-  TRAPS        = 'TRAPS',
-  CALVES       = 'CALVES',
+  CHEST = 'CHEST',
+  BACK = 'BACK',
+  SHOULDER = 'SHOULDER',
+  TRICEPS = 'TRICEPS',
+  BICEPS = 'BICEPS',
+  FOREARM = 'FOREARM',
+  ABS = 'ABS',
+  GLUTES = 'GLUTES',
+  HAMSTRING = 'HAMSTRING',
+  QUADRICEPS = 'QUADRICEPS',
+  TRAPS = 'TRAPS',
+  CALVES = 'CALVES',
 }
 
 export enum ExerciseModality {
-  CARDIO        = 'CARDIO',
-  BARBELL       = 'BARBELL',
-  DUMBBELL      = 'DUMBBELL',
-  BODYWEIGHT    = 'BODYWEIGHT',
-  MACHINE       = 'MACHINE',
-  CABLE         = 'CABLE',
+  CARDIO = 'CARDIO',
+  BARBELL = 'BARBELL',
+  DUMBBELL = 'DUMBBELL',
+  BODYWEIGHT = 'BODYWEIGHT',
+  MACHINE = 'MACHINE',
+  CABLE = 'CABLE',
   SMITH_MACHINE = 'SMITH_MACHINE',
 }
 
 @Entity('exercises')
+@Unique('exercises_name_key', ['name'])
 export class Exercise {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ length: 100 })
   name: string;
 
-  @Column({ nullable: true })
-  muscle_group?: string;
-
-  @Column({ nullable: true })
-  type?: string;
-
-  @Column({ nullable: true })
-  difficulty?: string;
-
-  @Column({ nullable: true })
-  video_url?: string;
-
-  @Column({ nullable: true })
-  image_url?: string;
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  created_at: Date;
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  updated_at: Date;
-
-  @Column({ type: 'enum', enum: MuscleGroup })
+  @Column({
+    type: 'enum',
+    enum: MuscleGroup,
+    enumName: 'muscle_enum',          
+  })
   category: MuscleGroup;
 
-  @Column({ type: 'enum', enum: ExerciseModality })
+  @Column({
+    type: 'enum',
+    enum: ExerciseModality,
+    enumName: 'modality_enum',     
+  })
   modality: ExerciseModality;
+
+  @Column({ nullable: true, length: 50 })
+  difficulty?: string;
+
+  @Column({ nullable: true, length: 255 })
+  videoUrl?: string;
+
+  @Column({ nullable: true, length: 255 })
+  imageUrl?: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

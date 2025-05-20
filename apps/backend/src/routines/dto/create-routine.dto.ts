@@ -1,4 +1,39 @@
-import { IsOptional, IsString, IsBoolean } from 'class-validator';
+// src/routines/dto/create-routine.dto.ts
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { Type, Expose } from 'class-transformer';
+
+class ExerciseItemDto {
+  @IsInt()
+  @Expose({ name: 'exercise_id' })
+  exerciseId: number;
+
+  @IsOptional()
+  @IsInt()
+  @Expose({ name: 'exercise_order' })
+  exerciseOrder?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Expose({ name: 'default_sets' })
+  defaultSets?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Expose({ name: 'default_reps' })
+  defaultReps?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Expose({ name: 'default_weight' })
+  defaultWeight?: number;
+}
 
 export class CreateRoutineDto {
   @IsString()
@@ -10,13 +45,12 @@ export class CreateRoutineDto {
 
   @IsOptional()
   @IsBoolean()
-  is_public?: boolean;
+  @Expose({ name: 'is_public' })
+  isPublic?: boolean;
 
-  // 예: creatorId 생략 or JWT에서 꺼낼 수도
   @IsOptional()
-  exercises?: {
-    exerciseId: number;
-    defaultSets?: number;
-    defaultReps?: number;
-  }[];
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExerciseItemDto)
+  exercises?: ExerciseItemDto[];
 }

@@ -1,13 +1,20 @@
-import { IsNumber, IsOptional, IsDateString } from 'class-validator';
+// src/workouts/dto/create-workout-session.dto.ts
+import { IsDate, IsInt, IsOptional } from 'class-validator';
+import { Type, Expose } from 'class-transformer';
 
 export class CreateWorkoutSessionDto {
-  @IsNumber()
+  @IsInt()
+  @Expose({ name: 'user_id' })
   userId: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Expose({ name: 'routine_id' })
   routineId?: number;
 
-  @IsDateString()
-  start_time: string; // or Date
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  @Expose({ name: 'start_time' })
+  startTime?: Date;
 }

@@ -17,10 +17,13 @@ export class PostsService {
   createPost(dto: CreatePostDto) {
     const post = this.postRepo.create({
       user: { id: dto.userId } as any,
-      workout_session: dto.workoutSessionId ? { id: dto.workoutSessionId } as any : null,
+      workoutSession: dto.workoutSessionId
+        ? ({ id: dto.workoutSessionId } as any)
+        : null,
       content: dto.content,
-      image_url: dto.image_url,
+      imageUrl: dto.imageUrl,
     });
+
     return this.postRepo.save(post);
   }
 
@@ -32,9 +35,12 @@ export class PostsService {
     return this.postRepo.find();
   }
 
-  // 예: 좋아요 로직
+  /** 좋아요 등록 */
   async likePost(userId: number, postId: number) {
-    const like = this.likeRepo.create({ user: { id: userId } as any, post: { id: postId } as any });
+    const like = this.likeRepo.create({
+      user: { id: userId } as any,
+      post: { id: postId } as any,
+    });
     return this.likeRepo.save(like);
   }
 }

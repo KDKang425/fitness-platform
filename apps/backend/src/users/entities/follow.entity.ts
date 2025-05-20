@@ -1,18 +1,21 @@
-import { Entity, PrimaryGeneratedColumn, ManyToOne, Column, Unique } from 'typeorm';
-import { User } from './user.entity';
+import {
+  Entity, PrimaryGeneratedColumn, ManyToOne,
+  Unique, CreateDateColumn,
+} from 'typeorm';
+import { User } from 'src/users/entities/user.entity';
 
 @Entity('follows')
-@Unique(['follower', 'following'])
+@Unique('follows_follower_id_following_id_key', ['follower', 'following'])
 export class Follow {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE', nullable: false })
   follower: User;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE', nullable: false })
   following: User;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  created_at: Date;
+  @CreateDateColumn()
+  createdAt: Date;
 }

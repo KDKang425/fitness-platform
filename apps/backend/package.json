@@ -23,7 +23,7 @@
     "migration:generate": "npm run typeorm -- migration:generate -d ./data-source.ts",
     "migration:run": "npm run typeorm -- migration:run      -d ./data-source.ts",
     "migration:revert": "npm run typeorm -- migration:revert   -d ./data-source.ts",
-    "seed": "ts-node -r tsconfig-paths/register apps/backend/scripts/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register ./scripts/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -78,6 +78,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typeorm-extension": "^3.7.1",
+    "typeorm-naming-strategies": "^4.1.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },

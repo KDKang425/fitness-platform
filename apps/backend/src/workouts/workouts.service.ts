@@ -18,19 +18,19 @@ export class WorkoutsService {
     const session = this.sessionRepo.create({
       user: { id: dto.userId } as any,
       routine: dto.routineId ? ({ id: dto.routineId } as any) : null,
-      start_time: dto.start_time,
-      // ...
+      startTime: dto.startTime ?? new Date(),
+      // 필요 시 date, totalVolume 등 추가
     });
     return this.sessionRepo.save(session);
   }
 
-  async findSession(id: number) {
+  findSession(id: number) {
     return this.sessionRepo.findOne({ where: { id } });
   }
 
-  async findAllSessions() {
+  findAllSessions() {
     return this.sessionRepo.find();
   }
 
-  // 세트 추가 로직, 세션 완료 로직 등등 추가
+  // 세트 추가, 세션 종료 등의 로직은 이후 구현
 }

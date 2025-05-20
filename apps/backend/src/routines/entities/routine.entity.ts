@@ -1,27 +1,37 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Entity, PrimaryGeneratedColumn, Column,
+  ManyToOne, CreateDateColumn, UpdateDateColumn, OneToMany,
+} from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
+import { WorkoutSession } from 'src/workouts/entities/workout-session.entity';
+import { RoutineExercise } from 'src/routines/entities/routine-exercise.entity';
 
 @Entity('routines')
 export class Routine {
   @PrimaryGeneratedColumn()
   id: number;
 
-  // onDelete: 'CASCADE'는 DB에서 이미 설정
   @ManyToOne(() => User, { onDelete: 'CASCADE', nullable: true })
-  creator?: User;
+  creator?: User | null;
 
-  @Column()
+  @Column({ length: 100 })
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, length: 255 })
   description?: string;
 
   @Column({ default: true })
-  is_public: boolean;
+  isPublic: boolean;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  created_at: Date;
+  @OneToMany(() => WorkoutSession, (session) => session.routine)
+  workoutSessions: WorkoutSession[];
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  updated_at: Date;
+  @OneToMany(() => RoutineExercise, (re) => re.routine)
+  routineExercises: RoutineExercise[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

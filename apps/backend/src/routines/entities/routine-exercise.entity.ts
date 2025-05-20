@@ -1,27 +1,31 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { Routine } from './routine.entity';
+import {
+  Entity, PrimaryGeneratedColumn, Column, ManyToOne,
+  Unique,
+} from 'typeorm';
+import { Routine } from 'src/routines/entities/routine.entity';
 import { Exercise } from 'src/exercises/entities/exercise.entity';
 
 @Entity('routine_exercises')
+@Unique('routine_exercises_routine_id_exercise_id_key', ['routine', 'exercise'])
 export class RoutineExercise {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Routine, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Routine, { onDelete: 'CASCADE', nullable: false })
   routine: Routine;
 
-  @ManyToOne(() => Exercise, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Exercise, { onDelete: 'CASCADE', nullable: false })
   exercise: Exercise;
 
   @Column({ nullable: true })
-  exercise_order?: number;
+  exerciseOrder?: number;
 
   @Column({ nullable: true })
-  default_sets?: number;
+  defaultSets?: number;
 
   @Column({ nullable: true })
-  default_reps?: number;
+  defaultReps?: number;
 
   @Column({ nullable: true })
-  default_weight?: number;
+  defaultWeight?: number;
 }

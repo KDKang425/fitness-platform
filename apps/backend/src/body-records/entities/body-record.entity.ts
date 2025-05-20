@@ -6,7 +6,7 @@ export class BodyRecord {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE', nullable: false })
   user: User;
 
   @Column({ type: 'date', default: () => 'CURRENT_DATE' })
@@ -16,8 +16,8 @@ export class BodyRecord {
   weight: number;
 
   @Column({ nullable: true })
-  body_fat_percentage?: number;
+  bodyFatPercentage?: number;
 
   @Column({ nullable: true })
-  skeletal_muscle_mass?: number;
+  skeletalMuscleMass?: number;
 }
