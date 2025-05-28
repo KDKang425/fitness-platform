@@ -9,10 +9,9 @@
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src", 
+    "baseUrl": "./",
     "useDefineForClassFields": false,
     "strict": true,
-    "baseUrl": "./",
     "incremental": false,
     "skipLibCheck": true,
     "strictNullChecks": true,
@@ -22,8 +21,36 @@
     "noFallthroughCasesInSwitch": false,
     "strictPropertyInitialization": false,
     "moduleResolution": "node",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": ["src/*"],
+      "@common/*": ["src/common/*"],
+      "@config/*": ["src/config/*"],
+      "@auth/*": ["src/auth/*"],
+      "@users/*": ["src/users/*"],
+      "@exercises/*": ["src/exercises/*"],
+      "@workouts/*": ["src/workouts/*"],
+      "@routines/*": ["src/routines/*"],
+      "@posts/*": ["src/posts/*"],
+      "@stats/*": ["src/stats/*"],
+      "@body-records/*": ["src/body-records/*"],
+      "@personal-records/*": ["src/personal-records/*"],
+      "@routine-subscriptions/*": ["src/routine-subscriptions/*"]
+    }
   },
-  "include": ["src/**/*.ts", "data-source.ts", "migrations/**/*.ts"],
-  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts","src/seeds/**/*"]
+  "include": [
+    "src/**/*.ts",
+    "data-source.ts",
+    "seeds/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    ".tmp",
+    ".cache",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
 }

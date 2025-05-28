@@ -1,6 +1,6 @@
 import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
-import { Exercise, MuscleGroup, ExerciseModality } from '../exercises/entities/exercise.entity';
+import { Exercise, MuscleGroup, ExerciseModality } from '../src/exercises/entities/exercise.entity';
 import { faker } from '@faker-js/faker';
 
 export default class ExerciseSeeder implements Seeder {

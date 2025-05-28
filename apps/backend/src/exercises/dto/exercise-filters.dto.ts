@@ -1,4 +1,5 @@
 import { IsOptional, IsString, IsNumber, Min, IsEnum } from 'class-validator';
+import { Expose } from 'class-transformer';
 
 export enum DifficultyLevel {
   BEGINNER = 'beginner',
@@ -9,7 +10,8 @@ export enum DifficultyLevel {
 export class ExerciseFiltersDto {
   @IsOptional()
   @IsString()
-  muscle_group?: string;
+  @Expose({ name: 'muscle_group' })
+  muscleGroup?: string;
   
   @IsOptional()
   @IsString()

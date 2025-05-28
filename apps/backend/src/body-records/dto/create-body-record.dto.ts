@@ -1,17 +1,20 @@
 import { IsNumber, IsOptional } from 'class-validator';
+import { Expose } from 'class-transformer';
 
 export class CreateBodyRecordDto {
   @IsNumber()
-  userId: number; // user.id
+  userId: number;
 
   @IsNumber()
   weight: number;
 
   @IsOptional()
   @IsNumber()
-  body_fat_percentage?: number;
+  @Expose({ name: 'body_fat_percentage' })
+  bodyFatPercentage?: number;
 
   @IsOptional()
   @IsNumber()
-  skeletal_muscle_mass?: number;
+  @Expose({ name: 'skeletal_muscle_mass' })
+  skeletalMuscleMass?: number;
 }

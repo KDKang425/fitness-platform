@@ -1,4 +1,3 @@
-// src/posts/dto/create-post.dto.ts
 import { IsInt, IsOptional, IsString } from 'class-validator';
 import { Expose } from 'class-transformer';
 

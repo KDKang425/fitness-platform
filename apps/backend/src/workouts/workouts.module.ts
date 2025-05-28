@@ -8,12 +8,14 @@ import { Exercise } from '../exercises/entities/exercise.entity';
 import { User } from '../users/entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
 import { StatsModule } from '../stats/stats.module';
+import { PersonalRecordsModule } from '../personal-records/personal-records.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([WorkoutSession, WorkoutSet, Exercise, User]),
     AuthModule,
     StatsModule,
+    PersonalRecordsModule,
   ],
   controllers: [WorkoutsController],
   providers: [WorkoutsService],

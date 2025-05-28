@@ -1,4 +1,5 @@
 import { IsString, IsOptional } from 'class-validator';
+import { Expose } from 'class-transformer';
 
 export class CreateExerciseDto {
   @IsString()
@@ -6,7 +7,8 @@ export class CreateExerciseDto {
 
   @IsOptional()
   @IsString()
-  muscle_group?: string;
+  @Expose({ name: 'muscle_group' })
+  muscleGroup?: string;
 
   @IsOptional()
   @IsString()
@@ -18,9 +20,11 @@ export class CreateExerciseDto {
 
   @IsOptional()
   @IsString()
-  video_url?: string;
+  @Expose({ name: 'video_url' })
+  videoUrl?: string;
 
   @IsOptional()
   @IsString()
-  image_url?: string;
+  @Expose({ name: 'image_url' })
+  imageUrl?: string;
 }
