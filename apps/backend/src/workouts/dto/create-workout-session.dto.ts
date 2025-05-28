@@ -1,11 +1,11 @@
-// src/workouts/dto/create-workout-session.dto.ts
-import { IsDate, IsInt, IsOptional } from 'class-validator';
+import { IsInt, IsOptional, IsDate } from 'class-validator';
 import { Type, Expose } from 'class-transformer';
 
 export class CreateWorkoutSessionDto {
+  @IsOptional()
   @IsInt()
   @Expose({ name: 'user_id' })
-  userId: number;
+  userId?: number;
 
   @IsOptional()
   @IsInt()

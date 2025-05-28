@@ -1,4 +1,3 @@
-// src/routines/dto/create-routine.dto.ts
 import {
   IsArray,
   IsBoolean,
@@ -6,6 +5,7 @@ import {
   IsOptional,
   IsString,
   ValidateNested,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type, Expose } from 'class-transformer';
 
@@ -37,6 +37,7 @@ class ExerciseItemDto {
 
 export class CreateRoutineDto {
   @IsString()
+  @IsNotEmpty()
   name: string;
 
   @IsOptional()
@@ -46,11 +47,10 @@ export class CreateRoutineDto {
   @IsOptional()
   @IsBoolean()
   @Expose({ name: 'is_public' })
-  isPublic?: boolean;
+  isPublic?: boolean = true;
 
-  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ExerciseItemDto)
-  exercises?: ExerciseItemDto[];
+  exercises: ExerciseItemDto[];
 }

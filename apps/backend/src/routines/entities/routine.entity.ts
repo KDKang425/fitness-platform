@@ -5,6 +5,8 @@ import {
 import { User } from 'src/users/entities/user.entity';
 import { WorkoutSession } from 'src/workouts/entities/workout-session.entity';
 import { RoutineExercise } from 'src/routines/entities/routine-exercise.entity';
+import { RoutineSubscription } from '../../routine-subscriptions/entities/routine-subscription.entity'; // ⬅️ 추가
+
 
 @Entity('routines')
 export class Routine {
@@ -28,6 +30,9 @@ export class Routine {
 
   @OneToMany(() => RoutineExercise, (re) => re.routine)
   routineExercises: RoutineExercise[];
+
+  @OneToMany(() => RoutineSubscription, (s) => s.routine)
+  subscribers: RoutineSubscription[];
 
   @CreateDateColumn()
   createdAt: Date;

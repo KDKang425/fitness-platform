@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -12,50 +16,89 @@ export class RoutinesService {
     @InjectRepository(Routine)
     private readonly routineRepo: Repository<Routine>,
     @InjectRepository(RoutineExercise)
-    private readonly routineExerciseRepo: Repository<RoutineExercise>,
+    private readonly rxRepo: Repository<RoutineExercise>,
   ) {}
 
-  async createRoutine(dto: CreateRoutineDto) {
-    const routine = this.routineRepo.create({
-      name: dto.name,
-      description: dto.description,
-      isPublic: dto.isPublic ?? true,
+  async createRoutine(userId: number, dto: CreateRoutineDto) {
+    const routine = await this.routineRepo.save(
+      this.routineRepo.create({
+        name: dto.name,
+        description: dto.description,
+        isPublic: dto.isPublic ?? true,
+        creator: { id: userId } as any,
+      }),
+    );
+
+    const rxPartials = dto.exercises.map((ex, idx) => ({
+      routine,
+      exercise: { id: ex.exerciseId } as any,
+      exerciseOrder: ex.exerciseOrder ?? idx + 1,
+      defaultSets: ex.defaultSets ?? 3,
+      defaultReps: ex.defaultReps ?? 8,
+      defaultWeight: ex.defaultWeight ?? 0,
+    }));
+    await this.rxRepo.save(this.rxRepo.create(rxPartials));
+
+    return routine;
+  }
+
+  async changeVisibility(userId: number, id: number, isPublic: boolean) {
+    const routine = await this.routineRepo.findOne({
+      where: { id },
+      relations: ['creator'],
     });
-    const savedRoutine = await this.routineRepo.save(routine);
+    if (!routine) throw new NotFoundException();
+    if (routine.creator?.id !== userId) throw new ForbiddenException();
 
-    if (dto.exercises?.length) {
-      const routineExercises: RoutineExercise[] = dto.exercises.map((ex) =>
-        this.routineExerciseRepo.create({
-          routine: savedRoutine,
-          exercise: { id: ex.exerciseId } as any,
-          exerciseOrder: ex.exerciseOrder ?? 1,     
-          defaultSets: ex.defaultSets ?? 3,
-          defaultReps: ex.defaultReps ?? 8,
-          ...(ex.defaultWeight !== undefined
-            ? { defaultWeight: ex.defaultWeight }
-            : {}),
-        }),
-      );
+    routine.isPublic = isPublic;
+    return this.routineRepo.save(routine);
+  }
 
-      await this.routineExerciseRepo.save(routineExercises);
-    }
+  async list(userId: number, q = '', sort = 'recent') {
+    const qb = this.routineRepo
+      .createQueryBuilder('r')
+      .leftJoin('r.creator', 'u')
+      .where('(r.isPublic = true OR u.id = :uid)', { uid: userId });
 
-    return savedRoutine;
+    if (q) qb.andWhere('r.name ILIKE :q', { q: `%${q}%` });
+
+    qb.orderBy('r.createdAt', sort === 'popular' ? 'ASC' : 'DESC');
+    return qb.take(30).getMany();
+  }
+
+  async clone(userId: number, id: number) {
+    const origin = await this.routineRepo.findOne({
+      where: { id, isPublic: true },
+      relations: ['routineExercises'],
+    });
+    if (!origin) throw new NotFoundException();
+
+    const copy = await this.routineRepo.save(
+      this.routineRepo.create({
+        name: origin.name + ' (copy)',
+        description: origin.description,
+        creator: { id: userId } as any,
+        isPublic: false,
+      }),
+    );
+
+    const copyRx = origin.routineExercises.map((rx) => ({
+      routine: copy,
+      exercise: rx.exercise,
+      exerciseOrder: rx.exerciseOrder,
+      defaultSets: rx.defaultSets,
+      defaultReps: rx.defaultReps,
+      defaultWeight: rx.defaultWeight,
+    }));
+    await this.rxRepo.save(this.rxRepo.create(copyRx));
+
+    return copy;
   }
 
   findRoutine(id: number) {
     return this.routineRepo.findOne({
       where: { id },
-      relations: [
-        'routineExercises',
-        'routineExercises.exercise',
-      ],
-    });
-  }
-
-  findAllRoutines() {
-    return this.routineRepo.find({
-      relations: ['routineExercises'],
+      relations: ['routineExercises', 'routineExercises.exercise'],
     });
   }
 }

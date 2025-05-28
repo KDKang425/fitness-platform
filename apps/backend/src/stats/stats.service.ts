@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
+
 import { WorkoutSession } from '../workouts/entities/workout-session.entity';
 import { WorkoutSet } from '../workouts/entities/workout-set.entity';
-import { Exercise } from '../exercises/entities/exercise.entity';
+
+export interface StatsResponse {
+  totalVolume: number;
+  perMuscleGroup: { muscle_group: string; volume: string }[];
+  prevTotalVolume: number;
+  diffPercent: number;
+}
 
 @Injectable()
 export class StatsService {
@@ -12,48 +19,74 @@ export class StatsService {
     private readonly sessionRepo: Repository<WorkoutSession>,
     @InjectRepository(WorkoutSet)
     private readonly setRepo: Repository<WorkoutSet>,
-    @InjectRepository(Exercise)
-    private readonly exerciseRepo: Repository<Exercise>,
   ) {}
 
-  async getWeeklyStats(userId: number) {
-    const since = new Date();
-    since.setDate(since.getDate() - 6);
+  async getWeeklyStats(userId: number, base = new Date()): Promise<StatsResponse> {
+    const curFrom = this.startOfDay(this.addDays(base, -6));
+    const curTo = this.endOfDay(base);
 
-    const data = await this.sessionRepo
-      .createQueryBuilder('s')
-      .leftJoin('s.workoutSets', 'set')
-      .leftJoin('set.exercise', 'ex')
-      .select('ex.muscleGroup', 'muscle_group')
-      .addSelect('SUM(set.volume)', 'volume')
-      .where('s.userId = :userId', { userId })
-      .andWhere('s.startTime >= :since', { since })
-      .groupBy('ex.muscleGroup')
-      .getRawMany();
+    const prevTo = this.addDays(curFrom, -1);
+    const prevFrom = this.startOfDay(this.addDays(prevTo, -6));
 
-    const total = data.reduce((sum, d) => sum + Number(d.volume), 0);
-
-    return { totalVolume: total, perMuscleGroup: data };
+    return this.computeStats(userId, curFrom, curTo, prevFrom, prevTo);
   }
 
-  async getMonthlyStats(userId: number, date = new Date()) {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1; // 1-based
+  async getMonthlyStats(userId: number, base = new Date()): Promise<StatsResponse> {
+    const curFrom = new Date(base.getFullYear(), base.getMonth(), 1, 0, 0, 0);
+    const curTo = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59);
 
-    const data = await this.sessionRepo
+    const prevTo = this.addDays(curFrom, -1);
+    const prevFrom = new Date(prevTo.getFullYear(), prevTo.getMonth(), 1, 0, 0, 0);
+
+    return this.computeStats(userId, curFrom, curTo, prevFrom, prevTo);
+  }
+
+  private async computeStats(
+    userId: number,
+    curFrom: Date,
+    curTo: Date,
+    prevFrom: Date,
+    prevTo: Date,
+  ): Promise<StatsResponse> {
+    const curData = await this.queryMuscleVolume(userId, curFrom, curTo);
+    const curTotal = curData.reduce((s, d) => s + Number(d.volume), 0);
+
+    const prevData = await this.queryMuscleVolume(userId, prevFrom, prevTo);
+    const prevTotal = prevData.reduce((s, d) => s + Number(d.volume), 0);
+
+    const diff =
+      prevTotal === 0 ? 100 : ((curTotal - prevTotal) / prevTotal) * 100;
+
+    return {
+      totalVolume: curTotal,
+      perMuscleGroup: curData,
+      prevTotalVolume: prevTotal,
+      diffPercent: Math.round(diff * 10) / 10, 
+    };
+  }
+
+  private queryMuscleVolume(userId: number, from: Date, to: Date) {
+    return this.sessionRepo
       .createQueryBuilder('s')
       .leftJoin('s.workoutSets', 'set')
       .leftJoin('set.exercise', 'ex')
-      .select('ex.muscleGroup', 'muscle_group')
+      .select('ex.category', 'muscle_group')         
       .addSelect('SUM(set.volume)', 'volume')
-      .where('s.userId = :userId', { userId })
-      .andWhere('EXTRACT(YEAR FROM s.startTime) = :y', { y: year })
-      .andWhere('EXTRACT(MONTH FROM s.startTime) = :m', { m: month })
-      .groupBy('ex.muscleGroup')
+      .where('s.userId = :uid', { uid: userId })
+      .andWhere('s.startTime BETWEEN :from AND :to', { from, to })
+      .groupBy('ex.category')
       .getRawMany();
+  }
 
-    const total = data.reduce((sum, d) => sum + Number(d.volume), 0);
-
-    return { year, month, totalVolume: total, perMuscleGroup: data };
+  private startOfDay(d: Date) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+  }
+  private endOfDay(d: Date) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+  }
+  private addDays(d: Date, n: number) {
+    const r = new Date(d);
+    r.setDate(r.getDate() + n);
+    return r;
   }
 }

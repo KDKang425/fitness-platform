@@ -1,4 +1,3 @@
-// src/workouts/workouts.controller.ts
 import {
   Controller,
   Get,
@@ -7,19 +6,34 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { CreateWorkoutSessionDto } from './dto/create-workout-session.dto';
 import { CreateWorkoutSetDto } from './dto/create-workout-set.dto';
 import { FinishWorkoutSessionDto } from './dto/finish-workout-session.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+interface AuthRequest extends Request {
+  user: { id: number };
+}
+
+@UseGuards(JwtAuthGuard)               
 @Controller('workouts')
 export class WorkoutsController {
   constructor(private readonly workoutsService: WorkoutsService) {}
 
+  /** 세션 시작 */
   @Post()
-  startSession(@Body() dto: CreateWorkoutSessionDto) {
-    return this.workoutsService.startSession(dto);
+  startSession(
+    @Req() req: AuthRequest,
+    @Body() dto: CreateWorkoutSessionDto,
+  ) {
+    return this.workoutsService.startSession({
+      ...dto,
+      userId: req.user.id,             
+    });
   }
 
   @Post(':id/sets')

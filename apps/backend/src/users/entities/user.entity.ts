@@ -8,6 +8,8 @@ import { Post } from 'src/posts/entities/post.entity';
 import { Like } from 'src/posts/entities/like.entity';
 import { Follow } from 'src/users/entities/follow.entity';
 import { BodyRecord } from 'src/body-records/entities/body-record.entity';
+import { RoutineSubscription } from '../../routine-subscriptions/entities/routine-subscription.entity';
+import { PersonalRecord } from '../../personal-records/entities/personal-record.entity';
 
 @Entity('users')
 @Unique('users_email_key', ['email'])         
@@ -54,4 +56,10 @@ export class User {
 
   @OneToMany(() => BodyRecord, (record) => record.user)
   bodyRecords: BodyRecord[];
+
+  @OneToMany(() => RoutineSubscription, (s) => s.user)
+  routineSubscriptions: RoutineSubscription[];
+
+  @OneToMany(() => PersonalRecord, (pr) => pr.user)
+  personalRecords: PersonalRecord[];  
 }

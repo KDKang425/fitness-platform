@@ -11,6 +11,8 @@ import { PostsModule } from './posts/posts.module';
 import { ExercisesModule } from './exercises/exercises.module';
 import { AuthModule } from './auth/auth.module';
 import { StatsModule } from './stats/stats.module';
+import { RoutineSubscriptionsModule } from './routine-subscriptions/routine-subscriptions.module';
+import { PersonalRecordsModule } from './personal-records/personal-records.module';
 
 @Module({
   imports: [
@@ -45,6 +47,10 @@ import { StatsModule } from './stats/stats.module';
         AuthModule,
 
         StatsModule,
+
+        RoutineSubscriptionsModule,
+
+        PersonalRecordsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
