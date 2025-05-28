@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -20,6 +21,13 @@ export class RoutinesService {
   ) {}
 
   async createRoutine(userId: number, dto: CreateRoutineDto) {
+    const seen = new Set<number>();
+    for (const ex of dto.exercises) {
+      if (seen.has(ex.exerciseId))
+        throw new BadRequestException('Duplicate exercise in routine');
+      seen.add(ex.exerciseId);
+    }
+
     const routine = await this.routineRepo.save(
       this.routineRepo.create({
         name: dto.name,

@@ -9,6 +9,7 @@ import { Repository, DataSource } from 'typeorm';
 import { WorkoutSession } from './entities/workout-session.entity';
 import { WorkoutSet } from './entities/workout-set.entity';
 import { Exercise } from '../exercises/entities/exercise.entity';
+import { User } from '../users/entities/user.entity';
 
 import { CreateWorkoutSessionDto } from './dto/create-workout-session.dto';
 import { CreateWorkoutSetDto } from './dto/create-workout-set.dto';
@@ -25,13 +26,18 @@ export class WorkoutsService {
     private readonly setRepo: Repository<WorkoutSet>,
     @InjectRepository(Exercise)
     private readonly exerciseRepo: Repository<Exercise>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly prSvc: PersonalRecordsService,
   ) {}
 
   async startSession(dto: CreateWorkoutSessionDto) {
+    const user = await this.userRepo.findOneBy({ id: dto.userId });
+    if (!user) throw new NotFoundException('User not found');
+
     const session = this.sessionRepo.create({
-      user: { id: dto.userId } as any,
+      user,
       routine: dto.routineId ? ({ id: dto.routineId } as any) : null,
       startTime: dto.startTime ?? new Date(),
       totalVolume: 0,
@@ -42,7 +48,7 @@ export class WorkoutsService {
   async addSet(dto: CreateWorkoutSetDto) {
     const session = await this.sessionRepo.findOne({
       where: { id: dto.sessionId },
-      relations: ['workoutSets', 'user'],      
+      relations: ['workoutSets', 'user'],
     });
     if (!session) throw new NotFoundException('Session not found');
     if (session.endTime)
@@ -52,8 +58,7 @@ export class WorkoutsService {
     if (!exercise) throw new NotFoundException('Exercise not found');
 
     const setNumber =
-      dto.setNumber ??
-      (session.workoutSets ? session.workoutSets.length + 1 : 1);
+      dto.setNumber ?? (session.workoutSets ? session.workoutSets.length + 1 : 1);
 
     const volume = calcVolume(dto.reps, dto.weight);
 
@@ -102,11 +107,13 @@ export class WorkoutsService {
     return this.sessionRepo.save(session);
   }
 
-  findSession(id: number) {
-    return this.sessionRepo.findOne({
+  async findSession(id: number) {
+    const session = await this.sessionRepo.findOne({
       where: { id },
       relations: ['workoutSets', 'workoutSets.exercise'],
     });
+    if (!session) throw new NotFoundException('Session not found');
+    return session;
   }
 
   findAllSessions() {

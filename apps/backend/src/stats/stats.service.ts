@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository } from 'typeorm';
 
 import { WorkoutSession } from '../workouts/entities/workout-session.entity';
 import { WorkoutSet } from '../workouts/entities/workout-set.entity';
@@ -61,7 +61,7 @@ export class StatsService {
       totalVolume: curTotal,
       perMuscleGroup: curData,
       prevTotalVolume: prevTotal,
-      diffPercent: Math.round(diff * 10) / 10, 
+      diffPercent: Math.round(diff * 10) / 10,
     };
   }
 
@@ -70,7 +70,7 @@ export class StatsService {
       .createQueryBuilder('s')
       .leftJoin('s.workoutSets', 'set')
       .leftJoin('set.exercise', 'ex')
-      .select('ex.category', 'muscle_group')         
+      .select('ex.category', 'muscle_group')
       .addSelect('SUM(set.volume)', 'volume')
       .where('s.userId = :uid', { uid: userId })
       .andWhere('s.startTime BETWEEN :from AND :to', { from, to })
