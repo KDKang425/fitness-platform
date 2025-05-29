@@ -14,7 +14,7 @@ import { UpdateRoutineDto } from './dto/update-routine.dto';
 
 interface ListOptions {
   query?: string;
-  sort?: 'recent' | 'popular' | 'alphabetical';
+  sort?: 'recent' | 'popular' | 'alphabetical' | 'trending';
   filter?: 'all' | 'mine' | 'public' | 'subscribed';
   page?: number;
   limit?: number;
@@ -164,6 +164,18 @@ export class RoutinesService {
           .groupBy('r.id')
           .addGroupBy('u.id')
           .orderBy('subscriberCount', 'DESC');
+        break;
+      case 'trending':
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        
+        qb.leftJoin('r.subscribers', 'sub', 'sub.subscribedAt >= :date', { 
+          date: threeMonthsAgo 
+        })
+          .addSelect('COUNT(DISTINCT sub.id)', 'recentSubscribers')
+          .groupBy('r.id')
+          .addGroupBy('u.id')
+          .orderBy('recentSubscribers', 'DESC');
         break;
       case 'alphabetical':
         qb.orderBy('r.name', 'ASC');

@@ -22,19 +22,29 @@ async function bootstrap() {
   
   app.use(helmet());
   
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 100,
-      message: 'Too many requests from this IP, please try again later.',
-      keyGenerator: (req: any) => {
-        return req.user?.userId || req.ip;
-      },
-      skip: (req: any) => {
-        return req.user?.role === 'admin';
-      }
-    }),
-  );
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: 'Too many authentication attempts, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: 'Too many requests from this IP, please try again later.',
+    keyGenerator: (req: any) => {
+      return req.user?.userId || req.ip;
+    },
+    skip: (req: any) => {
+      return req.user?.role === 'admin';
+    }
+  });
+
+  app.use('/api/v1/auth/login', authLimiter);
+  app.use('/api/v1/auth/register', authLimiter);
+  app.use(generalLimiter);
   
   app.useGlobalFilters(new HttpExceptionFilter());
   

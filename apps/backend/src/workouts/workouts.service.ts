@@ -13,7 +13,7 @@ import { Exercise } from '../exercises/entities/exercise.entity';
 import { User } from '../users/entities/user.entity';
 import { Routine } from '../routines/entities/routine.entity';
 
-import { CreateWorkoutSessionDto } from './dto/create-workout-session.dto';
+import { CreateWorkoutSessionDto, WorkoutType } from './dto/create-workout-session.dto';
 import { CreateWorkoutSetDto } from './dto/create-workout-set.dto';
 
 import { calcVolume } from '../common/utils/volume.util';
@@ -131,6 +131,13 @@ export class WorkoutsService {
   }
 
   async addSet(dto: CreateWorkoutSetDto) {
+    if (dto.weight > 500) {
+      throw new BadRequestException('무게는 500kg를 초과할 수 없습니다.');
+    }
+    if (dto.reps > 100) {
+      throw new BadRequestException('반복 횟수는 100회를 초과할 수 없습니다.');
+    }
+
     const session = await this.sessionRepo.findOne({
       where: { id: dto.sessionId },
       relations: ['workoutSets', 'workoutSets.exercise', 'user'],
@@ -313,7 +320,7 @@ export class WorkoutsService {
           endDate.toISOString().split('T')[0]
         ),
       },
-      relations: ['workoutSets'],
+      relations: ['workoutSets', 'workoutSets.exercise'],
       order: { date: 'ASC' },
     });
 

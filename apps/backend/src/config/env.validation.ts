@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsNumber, IsString, IsOptional, validateSync, IsNotEmpty, Min, Max } from 'class-validator';
+import { IsNumber, IsString, IsOptional, validateSync, IsNotEmpty, Min, Max, IsIn } from 'class-validator';
 
 export class EnvironmentVariables {
   @IsNumber()
@@ -21,6 +21,7 @@ export class EnvironmentVariables {
   DB_DATABASE: string;
 
   @IsString()
+  @IsNotEmpty()
   JWT_SECRET: string;
 
   @IsOptional()
@@ -65,10 +66,9 @@ export class EnvironmentVariables {
   @Max(86400)
   CACHE_EXERCISE_TTL?: number = 3600;
 
-  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  FRONTEND_URL?: string;
+  FRONTEND_URL: string;
 
   @IsOptional()
   @IsString()
@@ -89,6 +89,15 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SMTP_PASS?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  BASE_URL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(['development', 'production', 'test'])
+  NODE_ENV: string;
 }
 
 export function validate(config: Record<string, unknown>) {

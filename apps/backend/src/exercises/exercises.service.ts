@@ -10,6 +10,17 @@ import { ExerciseFiltersDto } from './dto/exercise-filters.dto';
 
 @Injectable()
 export class ExercisesService {
+  private readonly EXERCISE_VIDEOS = {
+    'Barbell Bench Press': 'https://youtube.com/watch?v=SCVCLChPQFY',
+    'Pull-Up': 'https://youtube.com/watch?v=eGo4IYlbE5g',
+    'Barbell Squat': 'https://youtube.com/watch?v=ultWZbUMPL8',
+    'Deadlift': 'https://youtube.com/watch?v=VL5Ab0T07e4',
+    'Overhead Press': 'https://youtube.com/watch?v=QAQ64hK4Xxs',
+    'Barbell Row': 'https://youtube.com/watch?v=kBWAon7ItDw',
+    'Bicep Curl': 'https://youtube.com/watch?v=ykJmrZ5v0Oo',
+    'Triceps Push-down': 'https://youtube.com/watch?v=2-LAMcpzODU',
+  };
+
   constructor(
     @InjectRepository(Exercise)
     private readonly exerciseRepo: Repository<Exercise>,
@@ -30,7 +41,7 @@ export class ExercisesService {
       category: dto.muscleGroup as MuscleGroup,
       modality: dto.type as ExerciseModality,
       difficulty: dto.difficulty,
-      videoUrl: dto.videoUrl,
+      videoUrl: dto.videoUrl || this.EXERCISE_VIDEOS[dto.name],
       imageUrl: dto.imageUrl,
     });
 

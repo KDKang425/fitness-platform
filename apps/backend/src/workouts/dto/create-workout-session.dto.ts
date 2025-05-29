@@ -1,5 +1,11 @@
-import { IsInt, IsOptional, IsDate } from 'class-validator';
+import { IsInt, IsOptional, IsDate, IsEnum } from 'class-validator';
 import { Type, Expose } from 'class-transformer';
+
+export enum WorkoutType {
+  PROGRAM = 'program',
+  FREE = 'free',
+  TEMPLATE = 'template',
+}
 
 export class CreateWorkoutSessionDto {
   @IsOptional()
@@ -17,4 +23,12 @@ export class CreateWorkoutSessionDto {
   @Type(() => Date)
   @Expose({ name: 'start_time' })
   startTime?: Date;
+
+  @IsOptional()
+  @IsInt()
+  templateId?: number;
+
+  @IsOptional()
+  @IsEnum(WorkoutType)
+  type?: WorkoutType;
 }
