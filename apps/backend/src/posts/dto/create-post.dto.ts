@@ -19,4 +19,5 @@ export class CreatePostDto {
   @IsString()
   @Expose({ name: 'image_url' })
   imageUrl?: string;
+  
 }
