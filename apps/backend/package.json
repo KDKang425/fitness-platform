@@ -23,7 +23,7 @@
     "migration:generate": "npm run typeorm -- migration:generate -d ./data-source.ts",
     "migration:run": "npm run typeorm -- migration:run      -d ./data-source.ts",
     "migration:revert": "npm run typeorm -- migration:revert   -d ./data-source.ts",
-    "seed": "ts-node -r tsconfig-paths/register -r dotenv/config seeds/seed-exercises.ts"
+    "seed:dev": "ts-node -r tsconfig-paths/register -r dotenv/config seeds/seed-exercises.ts && ts-node -r tsconfig-paths/register -r dotenv/config seeds/seed-demo-data.ts"
   },
   "dependencies": {
     "@nestjs/bull": "^11.0.2",
@@ -73,7 +73,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
-    "@faker-js/faker": "^9.7.0",
+    "@faker-js/faker": "^9.8.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
@@ -88,6 +88,7 @@
     "@types/nodemailer": "^6.4.17",
     "@types/passport-local": "^1.0.38",
     "@types/supertest": "^6.0.2",
+    "bcrypt": "^6.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
