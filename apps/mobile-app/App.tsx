@@ -4,15 +4,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import LoginScreen from './src/screens/LoginScreen';
+import SignupScreen from './src/screens/SignupScreen';
 
-// ★ 앞으로 HomeScreen·TabNavigator 등을 추가하면 여기 import
 // import HomeScreen from './src/screens/HomeScreen';
 
 export type RootStackParamList = {
   Login: undefined;
   // Home: { user: any };     // 나중에 HomeScreen 만들면 주석 해제
+  Signup: undefined;
+  Main: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

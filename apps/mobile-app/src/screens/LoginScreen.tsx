@@ -1,9 +1,10 @@
+// src/screens/LoginScreen.tsx
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { api } from '../utils/api';       
+import { api } from '../utils/api';
 import { RootStackParamList } from '../../App';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
@@ -22,12 +23,12 @@ export default function LoginScreen({ navigation }: Props) {
       setSubmitting(true);
       const res = await api.post('/auth/login', { email, password });
       const { accessToken, refreshToken, user } = res.data;
-      await AsyncStorage.setItem('accessToken', accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken);
-      // navigation.replace('Home', { user });   // HomeScreen 추가 후 주석 해제
-      Alert.alert('로그인 성공', '일단 Home 화면 연결 전입니다.');
+      await AsyncStorage.multiSet([
+        ['accessToken', accessToken],
+        ['refreshToken', refreshToken],
+      ]);
+      navigation.replace('Main');           // 성공 시 탭으로 이동
     } catch (e: any) {
-      console.error(e);
       Alert.alert('로그인 실패', e?.response?.data?.message ?? '이메일/비밀번호를 확인해주세요.');
     } finally {
       setSubmitting(false);
@@ -37,7 +38,7 @@ export default function LoginScreen({ navigation }: Props) {
   return (
     <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#111' }}>
       <Text style={{ fontSize: 28, color: '#fff', marginBottom: 32, textAlign: 'center' }}>
-        Fitness Platform
+        Fitness Mate
       </Text>
 
       <TextInput
@@ -49,7 +50,6 @@ export default function LoginScreen({ navigation }: Props) {
         value={email}
         onChangeText={setEmail}
       />
-
       <TextInput
         placeholder="비밀번호"
         placeholderTextColor="#777"
@@ -72,6 +72,14 @@ export default function LoginScreen({ navigation }: Props) {
         <Text style={{ color: '#fff', textAlign: 'center', fontSize: 16 }}>
           {submitting ? '로그인 중...' : '로그인'}
         </Text>
+      </TouchableOpacity>
+
+      {/* ▼ 추가: 회원가입 이동 버튼 */}
+      <TouchableOpacity
+        style={{ marginTop: 24 }}
+        onPress={() => navigation.navigate('Signup')}
+      >
+        <Text style={{ color: '#ff7f27', textAlign: 'center' }}>아직 계정이 없으신가요? 회원가입</Text>
       </TouchableOpacity>
     </View>
   );
