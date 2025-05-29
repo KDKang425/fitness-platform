@@ -8,23 +8,26 @@ import {
   ParseIntPipe,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { CreateWorkoutSessionDto } from './dto/create-workout-session.dto';
 import { CreateWorkoutSetDto } from './dto/create-workout-set.dto';
 import { FinishWorkoutSessionDto } from './dto/finish-workout-session.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuthRequest } from '../common/interfaces/auth-request.interface';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
-interface AuthRequest extends Request {
-  user: { id: number };
-}
-
-@UseGuards(JwtAuthGuard)               
+@ApiTags('workouts')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard)
 @Controller('workouts')
 export class WorkoutsController {
   constructor(private readonly workoutsService: WorkoutsService) {}
 
-  /** 세션 시작 */
+  @ApiOperation({ summary: '운동 세션 시작' })
+  @ApiResponse({ status: 201, description: '세션이 성공적으로 시작됨' })
+  @ApiResponse({ status: 404, description: '사용자 또는 루틴을 찾을 수 없음' })
   @Post()
   startSession(
     @Req() req: AuthRequest,
@@ -32,10 +35,14 @@ export class WorkoutsController {
   ) {
     return this.workoutsService.startSession({
       ...dto,
-      userId: req.user.id,             
+      userId: req.user.userId,
     });
   }
 
+  @ApiOperation({ summary: '운동 세트 추가' })
+  @ApiResponse({ status: 201, description: '세트가 성공적으로 추가됨' })
+  @ApiResponse({ status: 404, description: '세션 또는 운동을 찾을 수 없음' })
+  @ApiResponse({ status: 400, description: '세션이 이미 종료됨' })
   @Post(':id/sets')
   addSet(
     @Param('id', ParseIntPipe) id: number,
@@ -44,6 +51,10 @@ export class WorkoutsController {
     return this.workoutsService.addSet({ ...dto, sessionId: id });
   }
 
+  @ApiOperation({ summary: '운동 세션 종료' })
+  @ApiResponse({ status: 200, description: '세션이 성공적으로 종료됨' })
+  @ApiResponse({ status: 404, description: '세션을 찾을 수 없음' })
+  @ApiResponse({ status: 400, description: '세션이 이미 종료됨' })
   @Patch(':id/finish')
   finishSession(
     @Param('id', ParseIntPipe) id: number,
@@ -52,13 +63,35 @@ export class WorkoutsController {
     return this.workoutsService.finishSession(id, dto.endTime);
   }
 
+  @ApiOperation({ summary: '운동 세션 상세 조회' })
+  @ApiResponse({ status: 200, description: '세션 정보 반환' })
+  @ApiResponse({ status: 404, description: '세션을 찾을 수 없음' })
   @Get(':id')
   findSession(@Param('id', ParseIntPipe) id: number) {
     return this.workoutsService.findSession(id);
   }
 
+  @ApiOperation({ summary: '내 운동 세션 목록 조회' })
+  @ApiResponse({ status: 200, description: '세션 목록 반환' })
   @Get()
-  findAll() {
-    return this.workoutsService.findAllSessions();
+  findMySessions(
+    @Req() req: AuthRequest,
+    @Query('page', ParseIntPipe) page = 1,
+    @Query('limit', ParseIntPipe) limit = 20,
+    @Query('month') month?: string,
+  ) {
+    return this.workoutsService.findUserSessions(
+      req.user.userId,
+      page,
+      limit,
+      month,
+    );
+  }
+
+  @ApiOperation({ summary: '오늘의 운동 통계' })
+  @ApiResponse({ status: 200, description: '오늘의 운동 통계 반환' })
+  @Get('today/stats')
+  getTodayStats(@Req() req: AuthRequest) {
+    return this.workoutsService.getTodayStats(req.user.userId);
   }
 }

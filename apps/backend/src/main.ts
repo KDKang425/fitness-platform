@@ -4,28 +4,37 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import './config/typeorm.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
   
-  // HttpExceptionFilter를 먼저 설정
+  app.setGlobalPrefix('api/v1');
+  
   app.useGlobalFilters(new HttpExceptionFilter());
   
-  // ValidationPipe 설정 - transform: true가 class-transformer를 활성화
+  app.useGlobalInterceptors(new ResponseInterceptor());
+  
   app.useGlobalPipes(
     new ValidationPipe({
-      transform: true,                    // class-transformer 활성화
+      transform: true,                    
       transformOptions: {
-        enableImplicitConversion: true,   // 암시적 타입 변환 활성화
+        enableImplicitConversion: true,   
       },
-      whitelist: true,                   // DTO에 없는 속성 제거
-      forbidNonWhitelisted: true,        // 허용되지 않은 속성이 있으면 에러
+      whitelist: true,                   
+      forbidNonWhitelisted: true,        
+      errorHttpStatusCode: 422,         
     }),
   );
 
   // CORS 설정
   app.enableCors({
-    origin: '*',
+    origin: configService.get('CORS_ORIGIN', '*'),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Swagger 설정
@@ -33,16 +42,38 @@ async function bootstrap() {
     .setTitle('Fitness Platform API')
     .setDescription('피트니스 플랫폼 API 문서')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
+    .addTag('auth', '인증 관련 API')
+    .addTag('users', '사용자 관련 API')
+    .addTag('workouts', '운동 세션 관련 API')
+    .addTag('exercises', '운동 종목 관련 API')
+    .addTag('routines', '루틴 관련 API')
+    .addTag('stats', '통계 관련 API')
+    .addTag('posts', '피드 관련 API')
     .build();
 
   const swaggerDoc = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api', app, swaggerDoc);
+  SwaggerModule.setup('api/docs', app, swaggerDoc, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
 
   // 서버 시작
-  const port = process.env.PORT || 3001;
+  const port = configService.get<number>('port', 3001);
   await app.listen(port);
-  console.log(`Server is running on http://localhost:${port}`);
+  console.log(`🚀 Server is running on http://localhost:${port}`);
+  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

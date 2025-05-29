@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Follow } from './entities/follow.entity';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -16,11 +22,38 @@ export class UsersService {
   ) {}
 
   async createUser(dto: CreateUserDto): Promise<User> {
-    const salt = await bcrypt.genSalt();
-    dto.password = await bcrypt.hash(dto.password, salt);
+    const existingEmail = await this.userRepo.findOne({
+      where: { email: dto.email },
+    });
+    if (existingEmail) {
+      throw new ConflictException('이메일이 이미 사용 중입니다.');
+    }
 
-    const user = this.userRepo.create(dto);
-    return this.userRepo.save(user);
+    const existingNickname = await this.userRepo.findOne({
+      where: { nickname: dto.nickname },
+    });
+    if (existingNickname) {
+      throw new ConflictException('닉네임이 이미 사용 중입니다.');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(dto.password, salt);
+
+    const user = this.userRepo.create({
+      ...dto,
+      password: hashedPassword,
+    });
+
+    try {
+      const savedUser = await this.userRepo.save(user);
+      const { password, ...result } = savedUser;
+      return result as User;
+    } catch (error: any) {
+      if (error?.code === '23505') { 
+        throw new ConflictException('이메일 또는 닉네임이 이미 사용 중입니다.');
+      }
+      throw error;
+    }
   }
 
   async findByEmail(email: string) {
@@ -28,11 +61,89 @@ export class UsersService {
   }
 
   async findOne(id: number) {
-    return this.userRepo.findOne({ where: { id } });
+    const user = await this.userRepo.findOne({
+      where: { id },
+      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt'],
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    return user;
   }
 
-  async findAll() {
-    return this.userRepo.find();
+  async getProfile(userId: number) {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const [followerCount, followingCount] = await Promise.all([
+      this.followRepo.count({ where: { following: { id: userId } } }),
+      this.followRepo.count({ where: { follower: { id: userId } } }),
+    ]);
+
+    return {
+      ...user,
+      followerCount,
+      followingCount,
+    };
+  }
+
+  async updateProfile(userId: number, dto: UpdateUserDto) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (dto.nickname && dto.nickname !== user.nickname) {
+      const existing = await this.userRepo.findOne({
+        where: { nickname: dto.nickname },
+      });
+      if (existing) {
+        throw new ConflictException('닉네임이 이미 사용 중입니다.');
+      }
+    }
+
+    if (dto.password) {
+      const salt = await bcrypt.genSalt(10);
+      dto.password = await bcrypt.hash(dto.password, salt);
+    }
+
+    Object.assign(user, dto);
+    const updated = await this.userRepo.save(user);
+    const { password, ...result } = updated;
+    return result;
+  }
+
+  async searchUsers(query?: string, page = 1, limit = 20) {
+    const qb = this.userRepo.createQueryBuilder('user')
+      .select(['user.id', 'user.nickname', 'user.profileImageUrl']);
+
+    if (query) {
+      qb.where('user.nickname ILIKE :query', { query: `%${query}%` });
+    }
+
+    const skip = (page - 1) * limit;
+    const [users, total] = await qb
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async remove(id: number) {
@@ -40,12 +151,20 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User with ID=${id} not found`);
     }
-    return this.userRepo.remove(user);
+    await this.userRepo.remove(user);
+    return { success: true, message: 'User deleted successfully' };
   }
 
   async followUser(followerId: number, followingId: number) {
     if (followerId === followingId) {
-      throw new BadRequestException('Cannot follow yourself');
+      throw new BadRequestException('자기 자신을 팔로우할 수 없습니다.');
+    }
+
+    const targetUser = await this.userRepo.findOne({
+      where: { id: followingId },
+    });
+    if (!targetUser) {
+      throw new NotFoundException('팔로우할 사용자를 찾을 수 없습니다.');
     }
 
     const existingFollow = await this.followRepo.findOne({
@@ -53,14 +172,16 @@ export class UsersService {
     });
     
     if (existingFollow) {
-      throw new ConflictException('Already following this user');
+      throw new ConflictException('이미 팔로우 중입니다.');
     }
 
     const follow = this.followRepo.create({
       follower: { id: followerId } as any,
       following: { id: followingId } as any,
     });
-    return this.followRepo.save(follow);
+    
+    await this.followRepo.save(follow);
+    return { success: true, message: 'Successfully followed user' };
   }
 
   async unfollowUser(followerId: number, followingId: number) {
@@ -70,55 +191,84 @@ export class UsersService {
     });
     
     if (result.affected === 0) {
-      throw new NotFoundException('Follow relationship not found');
+      throw new NotFoundException('팔로우 관계를 찾을 수 없습니다.');
     }
     
-    return { success: true };
+    return { success: true, message: 'Successfully unfollowed user' };
   }
 
-  async getFollowers(userId: number) {
-    const followers = await this.followRepo.find({
-      where: { following: { id: userId } },
-      relations: ['follower'],
-      select: {
-        id: true,
-        createdAt: true,
-        follower: {
-          id: true,
-          nickname: true,
-          profileImageUrl: true,
-        },
-      },
-    });
+  async getFollowers(userId: number, page = 1, limit = 20) {
+    const query = this.followRepo.createQueryBuilder('follow')
+      .leftJoinAndSelect('follow.follower', 'follower')
+      .where('follow.following.id = :userId', { userId })
+      .select([
+        'follow.id',
+        'follow.createdAt',
+        'follower.id',
+        'follower.nickname',
+        'follower.profileImageUrl',
+      ]);
+
+    const skip = (page - 1) * limit;
+    const [followers, total] = await query
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
     
-    return followers.map(f => ({
-      id: f.follower.id,
-      nickname: f.follower.nickname,
-      profileImageUrl: f.follower.profileImageUrl,
-      followedAt: f.createdAt,
-    }));
+    return {
+      followers: followers.map(f => ({
+        id: f.follower.id,
+        nickname: f.follower.nickname,
+        profileImageUrl: f.follower.profileImageUrl,
+        followedAt: f.createdAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
-  async getFollowing(userId: number) {
-    const following = await this.followRepo.find({
-      where: { follower: { id: userId } },
-      relations: ['following'],
-      select: {
-        id: true,
-        createdAt: true,
-        following: {
-          id: true,
-          nickname: true,
-          profileImageUrl: true,
-        },
-      },
-    });
+  async getFollowing(userId: number, page = 1, limit = 20) {
+    const query = this.followRepo.createQueryBuilder('follow')
+      .leftJoinAndSelect('follow.following', 'following')
+      .where('follow.follower.id = :userId', { userId })
+      .select([
+        'follow.id',
+        'follow.createdAt',
+        'following.id',
+        'following.nickname',
+        'following.profileImageUrl',
+      ]);
+
+    const skip = (page - 1) * limit;
+    const [following, total] = await query
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
     
-    return following.map(f => ({
-      id: f.following.id,
-      nickname: f.following.nickname,
-      profileImageUrl: f.following.profileImageUrl,
-      followedAt: f.createdAt,
-    }));
+    return {
+      following: following.map(f => ({
+        id: f.following.id,
+        nickname: f.following.nickname,
+        profileImageUrl: f.following.profileImageUrl,
+        followedAt: f.createdAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async isFollowing(followerId: number, followingId: number): Promise<boolean> {
+    const count = await this.followRepo.count({
+      where: { follower: { id: followerId }, following: { id: followingId } },
+    });
+    return count > 0;
   }
 }

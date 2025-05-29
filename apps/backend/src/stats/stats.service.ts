@@ -1,15 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between, MoreThanOrEqual } from 'typeorm';
 
 import { WorkoutSession } from '../workouts/entities/workout-session.entity';
 import { WorkoutSet } from '../workouts/entities/workout-set.entity';
+import { PersonalRecord } from '../personal-records/entities/personal-record.entity';
+import { MuscleGroup } from '../exercises/entities/muscle-group.enum';
 
 export interface StatsResponse {
   totalVolume: number;
-  perMuscleGroup: { muscle_group: string; volume: string }[];
+  perMuscleGroup: { muscle_group: string; volume: number; percentage: number }[];
   prevTotalVolume: number;
   diffPercent: number;
+  sessionCount: number;
+  avgVolumePerSession: number;
+}
+
+export interface MuscleHeatmapData {
+  muscle: string;
+  data: { date: string; volume: number }[];
 }
 
 @Injectable()
@@ -19,6 +28,8 @@ export class StatsService {
     private readonly sessionRepo: Repository<WorkoutSession>,
     @InjectRepository(WorkoutSet)
     private readonly setRepo: Repository<WorkoutSet>,
+    @InjectRepository(PersonalRecord)
+    private readonly prRepo: Repository<PersonalRecord>,
   ) {}
 
   async getWeeklyStats(userId: number, base = new Date()): Promise<StatsResponse> {
@@ -48,42 +59,226 @@ export class StatsService {
     prevFrom: Date,
     prevTo: Date,
   ): Promise<StatsResponse> {
-    const curData = await this.queryMuscleVolume(userId, curFrom, curTo);
-    const curTotal = curData.reduce((s, d) => s + Number(d.volume), 0);
+    const [curData, curSessions] = await Promise.all([
+      this.queryMuscleVolume(userId, curFrom, curTo),
+      this.sessionRepo.count({
+        where: {
+          user: { id: userId },
+          startTime: Between(curFrom, curTo),
+        },
+      }),
+    ]);
+
+    const curTotal = curData.reduce((s, d) => s + d.volume, 0);
 
     const prevData = await this.queryMuscleVolume(userId, prevFrom, prevTo);
-    const prevTotal = prevData.reduce((s, d) => s + Number(d.volume), 0);
+    const prevTotal = prevData.reduce((s, d) => s + d.volume, 0);
 
-    const diff =
-      prevTotal === 0 ? 100 : ((curTotal - prevTotal) / prevTotal) * 100;
+    const diff = prevTotal === 0 ? 100 : ((curTotal - prevTotal) / prevTotal) * 100;
+
+    const perMuscleGroup = curData.map(item => ({
+      muscle_group: item.muscle_group,
+      volume: item.volume,
+      percentage: curTotal > 0 ? Math.round((item.volume / curTotal) * 100) : 0,
+    }));
 
     return {
       totalVolume: curTotal,
-      perMuscleGroup: curData,
+      perMuscleGroup,
       prevTotalVolume: prevTotal,
       diffPercent: Math.round(diff * 10) / 10,
+      sessionCount: curSessions,
+      avgVolumePerSession: curSessions > 0 ? Math.round(curTotal / curSessions) : 0,
     };
   }
 
-  private queryMuscleVolume(userId: number, from: Date, to: Date) {
-    return this.sessionRepo
+  private async queryMuscleVolume(userId: number, from: Date, to: Date) {
+    const result = await this.sessionRepo
       .createQueryBuilder('s')
       .leftJoin('s.workoutSets', 'set')
       .leftJoin('set.exercise', 'ex')
       .select('ex.category', 'muscle_group')
       .addSelect('SUM(set.volume)', 'volume')
-      .where('s.userId = :uid', { uid: userId })
+      .where('s.user.id = :uid', { uid: userId })
       .andWhere('s.startTime BETWEEN :from AND :to', { from, to })
       .groupBy('ex.category')
       .getRawMany();
+
+    return result.map(r => ({
+      muscle_group: r.muscle_group,
+      volume: Number(r.volume) || 0,
+    }));
+  }
+
+  async getExerciseProgress(userId: number, period: 'week' | 'month' | 'year') {
+    const now = new Date();
+    let from: Date;
+
+    switch (period) {
+      case 'week':
+        from = this.addDays(now, -7);
+        break;
+      case 'month':
+        from = this.addDays(now, -30);
+        break;
+      case 'year':
+        from = this.addDays(now, -365);
+        break;
+    }
+
+    const progress = await this.setRepo
+      .createQueryBuilder('set')
+      .leftJoin('set.workoutSession', 'session')
+      .leftJoin('set.exercise', 'exercise')
+      .select('exercise.id', 'exerciseId')
+      .addSelect('exercise.name', 'exerciseName')
+      .addSelect('MAX(set.weight)', 'maxWeight')
+      .addSelect('MAX(set.volume)', 'maxVolume')
+      .addSelect('AVG(set.weight)', 'avgWeight')
+      .addSelect('COUNT(DISTINCT session.id)', 'sessionCount')
+      .where('session.user.id = :userId', { userId })
+      .andWhere('session.startTime >= :from', { from })
+      .groupBy('exercise.id')
+      .addGroupBy('exercise.name')
+      .orderBy('COUNT(DISTINCT session.id)', 'DESC')
+      .limit(10)
+      .getRawMany();
+
+    return progress.map(p => ({
+      exerciseId: p.exerciseId,
+      exerciseName: p.exerciseName,
+      maxWeight: Number(p.maxWeight),
+      maxVolume: Number(p.maxVolume),
+      avgWeight: Math.round(Number(p.avgWeight) * 10) / 10,
+      sessionCount: Number(p.sessionCount),
+    }));
+  }
+
+  async getWorkoutFrequency(userId: number) {
+    const thirtyDaysAgo = this.addDays(new Date(), -30);
+
+    const sessions = await this.sessionRepo.find({
+      where: {
+        user: { id: userId },
+        startTime: MoreThanOrEqual(thirtyDaysAgo),
+      },
+      select: ['startTime'],
+    });
+
+    const byDayOfWeek = Array(7).fill(0);
+    const byHourOfDay = Array(24).fill(0);
+
+    sessions.forEach(session => {
+      if (session.startTime) {
+        const date = new Date(session.startTime);
+        byDayOfWeek[date.getDay()]++;
+        byHourOfDay[date.getHours()]++;
+      }
+    });
+
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    
+    return {
+      byDayOfWeek: dayNames.map((name, index) => ({
+        day: name,
+        count: byDayOfWeek[index],
+      })),
+      byHourOfDay: byHourOfDay.map((count, hour) => ({
+        hour,
+        count,
+      })),
+      totalSessions: sessions.length,
+      avgPerWeek: Math.round((sessions.length / 4.3) * 10) / 10,
+    };
+  }
+
+  async getMuscleHeatmap(userId: number): Promise<MuscleHeatmapData[]> {
+    const thirtyDaysAgo = this.addDays(new Date(), -30);
+
+    const data = await this.sessionRepo
+      .createQueryBuilder('s')
+      .leftJoin('s.workoutSets', 'set')
+      .leftJoin('set.exercise', 'ex')
+      .select('DATE(s.startTime)', 'date')
+      .addSelect('ex.category', 'muscle')
+      .addSelect('SUM(set.volume)', 'volume')
+      .where('s.user.id = :uid', { uid: userId })
+      .andWhere('s.startTime >= :from', { from: thirtyDaysAgo })
+      .groupBy('DATE(s.startTime)')
+      .addGroupBy('ex.category')
+      .getRawMany();
+
+    const muscleGroups = Object.values(MuscleGroup);
+    const heatmapData: MuscleHeatmapData[] = [];
+
+    for (const muscle of muscleGroups) {
+      const muscleData = data
+        .filter(d => d.muscle === muscle)
+        .map(d => ({
+          date: d.date,
+          volume: Number(d.volume) || 0,
+        }));
+
+      if (muscleData.length > 0) {
+        heatmapData.push({
+          muscle,
+          data: muscleData,
+        });
+      }
+    }
+
+    return heatmapData;
+  }
+
+  async getDashboardStats(userId: number) {
+    const [prs, recentSessions, monthlyVolume] = await Promise.all([
+      this.prRepo.find({
+        where: { user: { id: userId } },
+        relations: ['exercise'],
+        order: { estimated1RM: 'DESC' },
+        take: 5,
+      }),
+
+      this.sessionRepo.find({
+        where: { user: { id: userId } },
+        order: { startTime: 'DESC' },
+        take: 5,
+        select: ['id', 'date', 'totalVolume', 'totalTime', 'startTime'],
+      }),
+
+      this.getMonthlyStats(userId),
+    ]);
+
+    return {
+      topPRs: prs.map(pr => ({
+        exerciseName: pr.exercise.name,
+        bestWeight: pr.bestWeight,
+        bestReps: pr.bestReps,
+        estimated1RM: pr.estimated1RM,
+        lastUpdated: pr.updatedAt,
+      })),
+      recentSessions: recentSessions.map(s => ({
+        id: s.id,
+        date: s.date,
+        totalVolume: s.totalVolume,
+        duration: s.totalTime,
+      })),
+      monthlyStats: {
+        totalVolume: monthlyVolume.totalVolume,
+        sessionCount: monthlyVolume.sessionCount,
+        diffPercent: monthlyVolume.diffPercent,
+      },
+    };
   }
 
   private startOfDay(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
   }
+
   private endOfDay(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
   }
+
   private addDays(d: Date, n: number) {
     const r = new Date(d);
     r.setDate(r.getDate() + n);
