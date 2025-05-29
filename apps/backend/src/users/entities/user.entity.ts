@@ -1,6 +1,11 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, UpdateDateColumn, Unique, OneToMany,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Unique,
+  OneToMany,
 } from 'typeorm';
 import { Routine } from 'src/routines/entities/routine.entity';
 import { WorkoutSession } from 'src/workouts/entities/workout-session.entity';
@@ -13,6 +18,8 @@ import { PersonalRecord } from '../../personal-records/entities/personal-record.
 import { Notification } from '../../notification/entities/notification.entity';
 import { UserProgram } from '../../programs/entities/user-program.entity';
 import { FriendRequest } from './friend-request.entity';
+import { RefreshToken } from '../../auth/entities/refresh-token.entity';
+import { PostComment } from '../../posts/entities/post-comment.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -135,4 +142,9 @@ export class User {
   @OneToMany(() => FriendRequest, (request) => request.recipient)
   receivedFriendRequests: FriendRequest[];
 
+  @OneToMany(() => RefreshToken, (rt) => rt.user)
+  refreshTokens: RefreshToken[];
+
+  @OneToMany(() => PostComment, c => c.author)
+  postComments: PostComment[];
 }

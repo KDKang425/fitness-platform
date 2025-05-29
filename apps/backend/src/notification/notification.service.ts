@@ -199,4 +199,17 @@ export class NotificationService {
       { achievement },
     );
   }
+
+  async create(user: User, type: NotificationType, data: Record<string, any>) {
+    await this.notificationRepo.save({
+      user,              
+      type,
+      title: '',
+      body: '',
+      data,
+      read: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 }

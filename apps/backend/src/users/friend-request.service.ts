@@ -5,9 +5,12 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not } from 'typeorm';
-import { FriendRequest, FriendRequestStatus } from './entities/friend-request.entity';
-import { Follow } from './entities/follow.entity';
+import { Repository } from 'typeorm';
+import {
+  FriendRequest,
+  FriendRequestStatus,
+} from './entities/friend-request.entity';
+import { Follow } from '../users/entities/follow.entity';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/entities/notification.entity';
 
@@ -18,15 +21,15 @@ export class FriendRequestService {
     private requestRepo: Repository<FriendRequest>,
     @InjectRepository(Follow)
     private followRepo: Repository<Follow>,
-    private notificationService: NotificationService,
-  ) {}
+    private readonly noti: NotificationService,
+) {}
 
   async sendFriendRequest(requesterId: number, recipientId: number) {
     if (requesterId === recipientId) {
       throw new BadRequestException('자기 자신에게 친구 요청을 보낼 수 없습니다.');
     }
 
-    const [follow1, follow2] = await Promise.all([
+    const [f1, f2] = await Promise.all([
       this.followRepo.findOne({
         where: { follower: { id: requesterId }, following: { id: recipientId } },
       }),
@@ -34,90 +37,67 @@ export class FriendRequestService {
         where: { follower: { id: recipientId }, following: { id: requesterId } },
       }),
     ]);
+    if (f1 && f2) throw new ConflictException('이미 친구 관계입니다.');
 
-    if (follow1 && follow2) {
-      throw new ConflictException('이미 친구 관계입니다.');
-    }
-
-    const existingRequest = await this.requestRepo.findOne({
+    const dup = await this.requestRepo.findOne({
       where: [
         { requester: { id: requesterId }, recipient: { id: recipientId } },
         { requester: { id: recipientId }, recipient: { id: requesterId } },
       ],
     });
+    if (dup && dup.status === FriendRequestStatus.PENDING)
+      throw new ConflictException('이미 요청이 존재합니다.');
 
-    if (existingRequest) {
-      if (existingRequest.status === FriendRequestStatus.PENDING) {
-        if (existingRequest.requester.id === recipientId) {
-          return this.acceptFriendRequest(recipientId, requesterId);
-        } else {
-          throw new ConflictException('이미 친구 요청을 보냈습니다.');
-        }
-      } else if (existingRequest.status === FriendRequestStatus.REJECTED) {
-        existingRequest.status = FriendRequestStatus.PENDING;
-        existingRequest.createdAt = new Date();
-        existingRequest.respondedAt = undefined;
-        return this.requestRepo.save(existingRequest);
-      }
-    }
+    const saved = await this.requestRepo.save(
+      this.requestRepo.create({
+        requester: { id: requesterId } as any,
+        recipient: { id: recipientId } as any,
+        status: FriendRequestStatus.PENDING,
+      }),
+    );
 
-    const request = this.requestRepo.create({
-      requester: { id: requesterId } as any,
-      recipient: { id: recipientId } as any,
-      status: FriendRequestStatus.PENDING,
-    });
-
-    const saved = await this.requestRepo.save(request);
-
-    await this.notificationService.createNotification(
-      recipientId,
-      NotificationType.SOCIAL,
-      '새로운 친구 요청',
-      '새로운 친구 요청이 도착했습니다.',
-      { requestId: saved.id, requesterId }
+    await this.noti.create(
+      { id: recipientId } as any,
+      NotificationType.FRIEND_REQUEST,
+      { requesterId },
     );
 
     return saved;
   }
 
   async acceptFriendRequest(recipientId: number, requesterId: number) {
-    const request = await this.requestRepo.findOne({
+    const req = await this.requestRepo.findOne({
       where: {
         requester: { id: requesterId },
         recipient: { id: recipientId },
         status: FriendRequestStatus.PENDING,
       },
     });
+    if (!req) throw new NotFoundException('친구 요청을 찾을 수 없습니다.');
 
-    if (!request) {
-      throw new NotFoundException('친구 요청을 찾을 수 없습니다.');
-    }
-
-    request.status = FriendRequestStatus.ACCEPTED;
-    request.respondedAt = new Date();
-    await this.requestRepo.save(request);
+    req.status = FriendRequestStatus.ACCEPTED;
+    req.respondedAt = new Date();
+    await this.requestRepo.save(req);
 
     await Promise.all([
       this.followRepo.save(
         this.followRepo.create({
           follower: { id: requesterId } as any,
           following: { id: recipientId } as any,
-        })
+        }),
       ).catch(() => {}),
       this.followRepo.save(
         this.followRepo.create({
           follower: { id: recipientId } as any,
           following: { id: requesterId } as any,
-        })
+        }),
       ).catch(() => {}),
     ]);
 
-    await this.notificationService.createNotification(
-      requesterId,
-      NotificationType.SOCIAL,
-      '친구 요청 수락됨',
-      '친구 요청이 수락되었습니다.',
-      { recipientId }
+    await this.noti.create(
+      { id: requesterId } as any,
+      NotificationType.FRIEND_REQUEST_ACCEPTED,
+      { recipientId },
     );
 
     return { success: true, message: '친구 요청을 수락했습니다.' };

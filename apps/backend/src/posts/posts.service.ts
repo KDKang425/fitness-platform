@@ -7,6 +7,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { User } from '../users/entities/user.entity';
 import { WorkoutSession } from '../workouts/entities/workout-session.entity';
 import { PersonalRecord } from '../personal-records/entities/personal-record.entity';
+import { UpdatePostDto } from './dto/update-post.dto';
 
 @Injectable()
 export class PostsService {
@@ -554,4 +555,16 @@ export class PostsService {
       return this.getPersonalizedFeed(userId, page, limit);
     }
   }
+  async update(userId: number, postId: number, dto: UpdatePostDto) {
+  const post = await this.postRepo.findOne({
+    where: { id: postId },
+    relations: ['user'],
+  });
+  if (!post) throw new NotFoundException('포스트를 찾을 수 없습니다.');
+  if (post.user.id !== userId)
+    throw new ForbiddenException('수정 권한이 없습니다.');
+  if (dto.content !== undefined) post.content = dto.content;
+  if (dto.imageUrl !== undefined) post.imageUrl = dto.imageUrl;
+  return this.postRepo.save(post);
+}
 }

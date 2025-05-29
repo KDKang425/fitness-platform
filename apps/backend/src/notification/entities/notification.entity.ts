@@ -13,6 +13,9 @@ export enum NotificationType {
   SOCIAL = 'social',
   ACHIEVEMENT = 'achievement',
   SYSTEM = 'system',
+  FOLLOWED = 'followed',
+  FRIEND_REQUEST = 'friend_request',
+  FRIEND_REQUEST_ACCEPTED = 'friend_request_accepted',
 }
 
 @Entity('notifications')

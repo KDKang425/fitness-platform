@@ -17,6 +17,8 @@ import * as crypto from 'crypto';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/entities/notification.entity';
 
 @Injectable()
 export class UsersService {
@@ -27,6 +29,7 @@ export class UsersService {
     private readonly followRepo: Repository<Follow>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly dataSource: DataSource,
+    private readonly noti: NotificationService,
   ) {}
 
   async createUser(dto: CreateUserDto): Promise<User> {
@@ -68,7 +71,6 @@ export class UsersService {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 24);
 
-    // 토큰을 해시화하여 DB에 저장
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     
     await this.userRepo.update(userId, {
@@ -76,18 +78,15 @@ export class UsersService {
       emailVerificationExpiry: expiry,
     });
 
-    // 캐시에도 저장 (빠른 조회용)
     const cacheKey = `email-verify:${token}`;
     await this.cacheManager.set(cacheKey, userId, 86400000);
   }
 
   async verifyEmailToken(token: string) {
-    // 먼저 캐시에서 확인
     const cacheKey = `email-verify:${token}`;
     let userId = await this.cacheManager.get<number>(cacheKey);
 
     if (!userId) {
-      // 캐시에 없으면 DB에서 확인
       const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
       const user = await this.userRepo.findOne({ 
         where: { 
@@ -119,7 +118,6 @@ export class UsersService {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 1);
 
-    // 토큰을 해시화하여 DB에 저장
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     
     await this.userRepo.update(userId, {
@@ -127,18 +125,15 @@ export class UsersService {
       passwordResetExpiry: expiry,
     });
 
-    // 캐시에도 저장
     const cacheKey = `pwd-reset:${token}`;
     await this.cacheManager.set(cacheKey, userId, 3600000);
   }
 
   async verifyPasswordResetToken(token: string) {
-    // 먼저 캐시에서 확인
     const cacheKey = `pwd-reset:${token}`;
     let userId = await this.cacheManager.get<number>(cacheKey);
 
     if (!userId) {
-      // 캐시에 없으면 DB에서 확인
       const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
       const user = await this.userRepo.findOne({ 
         where: { 
@@ -169,7 +164,6 @@ export class UsersService {
       passwordResetExpiry: undefined,
     });
 
-    // 비밀번호 변경 시 모든 리프레시 토큰 무효화를 위한 캐시 클리어
     const cacheKey = `refresh-tokens:${userId}`;
     await this.cacheManager.del(cacheKey);
   }
@@ -319,27 +313,24 @@ export class UsersService {
       throw new BadRequestException('자기 자신을 팔로우할 수 없습니다.');
     }
 
-    const targetUser = await this.userRepo.findOne({
-      where: { id: followingId },
-    });
+    const targetUser = await this.userRepo.findOne({ where: { id: followingId } });
     if (!targetUser) {
       throw new NotFoundException('팔로우할 사용자를 찾을 수 없습니다.');
     }
 
-    const existingFollow = await this.followRepo.findOne({
+    const exists = await this.followRepo.findOne({
       where: { follower: { id: followerId }, following: { id: followingId } },
     });
-    
-    if (existingFollow) {
-      throw new ConflictException('이미 팔로우 중입니다.');
-    }
+    if (exists) throw new ConflictException('이미 팔로우 중입니다.');
 
     const follow = this.followRepo.create({
       follower: { id: followerId } as any,
       following: { id: followingId } as any,
     });
-    
     await this.followRepo.save(follow);
+
+    await this.noti.create(targetUser, NotificationType.FOLLOWED, { followerId });
+
     return { success: true, message: '팔로우했습니다.' };
   }
 

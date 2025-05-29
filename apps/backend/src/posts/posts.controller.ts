@@ -2,19 +2,21 @@ import {
   Controller,
   Get,
   Post as PostMethod,
+  Patch,
+  Delete,
   Body,
   Param,
   ParseIntPipe,
+  Query,
   UseGuards,
   Req,
-  Delete,
-  Query,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthRequest } from '../common/interfaces/auth-request.interface';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('posts')
 @Controller('posts')
@@ -28,10 +30,7 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   @PostMethod()
   create(@Req() req: AuthRequest, @Body() dto: CreatePostDto) {
-    return this.postsService.createPost({
-      ...dto,
-      userId: req.user.userId,
-    });
+    return this.postsService.createPost({ ...dto, userId: req.user.userId });
   }
 
   @ApiOperation({ summary: '포스트 상세 조회' })
@@ -79,7 +78,7 @@ export class PostsController {
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   @PostMethod(':id/likes')
-  async likePost(
+  likePost(
     @Req() req: AuthRequest,
     @Param('id', ParseIntPipe) postId: number,
   ) {
@@ -92,11 +91,26 @@ export class PostsController {
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   @Delete(':id/likes')
-  async unlikePost(
+  unlikePost(
     @Req() req: AuthRequest,
     @Param('id', ParseIntPipe) postId: number,
   ) {
     return this.postsService.unlikePost(req.user.userId, postId);
+  }
+
+  @ApiOperation({ summary: '포스트 수정' })
+  @ApiResponse({ status: 200, description: '수정 성공' })
+  @ApiResponse({ status: 403, description: '수정 권한이 없음' })
+  @ApiResponse({ status: 404, description: '포스트를 찾을 수 없음' })
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  updatePost(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdatePostDto,
+    @Req() req: AuthRequest,
+  ) {
+    return this.postsService.update(req.user.userId, id, dto);
   }
 
   @ApiOperation({ summary: '내 포스트 삭제' })
@@ -106,7 +120,7 @@ export class PostsController {
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async deletePost(
+  deletePost(
     @Req() req: AuthRequest,
     @Param('id', ParseIntPipe) id: number,
   ) {

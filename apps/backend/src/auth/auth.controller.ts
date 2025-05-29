@@ -4,7 +4,8 @@ import { LocalAuthGuard } from './local-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -48,9 +49,10 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: '토큰 갱신' })
-  @ApiResponse({ status: 200, description: '새 액세스 토큰 발급' })
+  @ApiResponse({ status: 200, description: '새 액세스·리프레시 토큰 발급' })
+  @ApiBearerAuth()
   @Post('refresh')
-  async refreshToken(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refreshToken(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshTokens(dto.refreshToken);
   }
 }
