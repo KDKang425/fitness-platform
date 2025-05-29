@@ -1,19 +1,27 @@
 import React from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 
-interface Props {
+export interface SetRowProps {
   index: number
   weight: number
   reps: number
+  onLongPress?: () => void
 }
 
-export default function SetRow({ index, weight, reps }: Props) {
+export default function SetRow({
+  index,
+  weight,
+  reps,
+  onLongPress,
+}: SetRowProps) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.index}>{index}</Text>
-      <Text style={styles.text}>{weight} kg</Text>
-      <Text style={styles.text}>{reps} 회</Text>
-    </View>
+    <TouchableOpacity onLongPress={onLongPress} activeOpacity={0.7}>
+      <View style={styles.row}>
+        <Text style={styles.index}>{index}</Text>
+        <Text style={styles.text}>{weight} kg</Text>
+        <Text style={styles.text}>{reps} 회</Text>
+      </View>
+    </TouchableOpacity>
   )
 }
 

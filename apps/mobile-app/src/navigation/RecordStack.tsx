@@ -2,11 +2,13 @@ import React from 'react'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import RecordScreen from '../screens/RecordScreen'
 import AddRecordScreen from '../screens/AddRecordScreen'
+import WorkoutDetailScreen from '../screens/WorkoutDetailScreen'  
 import Ionicons from '@expo/vector-icons/Ionicons'
 
 export type RecordStackParamList = {
   Record: undefined
   AddRecord: undefined
+  WorkoutDetail: { id: number }          
 }
 
 const Stack = createNativeStackNavigator<RecordStackParamList>()
@@ -19,6 +21,7 @@ export default function RecordStack() {
         headerTintColor: '#ff7f27',
       }}
     >
+      {}
       <Stack.Screen
         name="Record"
         component={RecordScreen}
@@ -35,7 +38,20 @@ export default function RecordStack() {
           ),
         })}
       />
-      <Stack.Screen name="AddRecord" component={AddRecordScreen} options={{ title: '기록 추가' }} />
+
+      {}
+      <Stack.Screen
+        name="AddRecord"
+        component={AddRecordScreen}
+        options={{ title: '기록 추가' }}
+      />
+
+      {}
+      <Stack.Screen
+        name="WorkoutDetail"
+        component={WorkoutDetailScreen}
+        options={{ title: '세션 상세' }}
+      />
     </Stack.Navigator>
   )
 }

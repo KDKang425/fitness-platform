@@ -1,0 +1,14 @@
+{
+  "cli": { "version": ">= 7.0.0" },
+  "build": {
+    "preview": {
+      "developmentClient": true,
+      "channel": "preview",
+      "distribution": "internal"
+    },
+    "release": {
+      "channel": "production",
+      "autoIncrement": true
+    }
+  }
+}

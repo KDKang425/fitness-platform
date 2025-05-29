@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
 import { View, FlatList, Text, Button, StyleSheet, Alert } from 'react-native'
-import api from '../utils/api'
+import api from '../utils/api'  
 import ExercisePickerModal from '../components/ExercisePickerModal'
 
 export default function FreeWorkoutScreen({ navigation }: any) {
   const [selected, setSelected] = useState<any[]>([])
-  const [modal,     setModal]   = useState(false)
+  const [modal, setModal] = useState(false)
 
   const start = async () => {
     try {
@@ -14,7 +14,7 @@ export default function FreeWorkoutScreen({ navigation }: any) {
         exercises: selected.map((e) => e.id),
       })
       navigation.replace('WorkoutSession', { sessionId: data.id })
-    } catch (e) {
+    } catch {
       Alert.alert('오류', '세션 생성 실패')
     }
   }
