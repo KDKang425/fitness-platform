@@ -5,7 +5,7 @@ import { WorkoutSession } from '../workouts/entities/workout-session.entity';
 import { WorkoutSet } from '../workouts/entities/workout-set.entity';
 import { MuscleGroup } from '../exercises/entities/muscle-group.enum';
 
-interface MuscleRecoveryStatus {
+export interface MuscleRecoveryStatus {
   muscle: MuscleGroup;
   lastWorked: Date | null;
   recoveryHours: number;

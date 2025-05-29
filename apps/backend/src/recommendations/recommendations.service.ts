@@ -8,7 +8,7 @@ import { Routine } from '../routines/entities/routine.entity';
 import { UserProgram } from '../programs/entities/user-program.entity';
 import { Exercise } from '../exercises/entities/exercise.entity';
 
-interface UserProfile {
+export interface UserProfile {
   experienceLevel: 'beginner' | 'intermediate' | 'advanced';
   primaryGoals: string[];
   workoutFrequency: number;
@@ -22,7 +22,7 @@ interface UserProfile {
   recentExercises: { exerciseId: number; frequency: number }[];
 }
 
-interface ProgramRecommendation {
+export interface ProgramRecommendation {
   routine: Routine;
   score: number;
   reasons: string[];

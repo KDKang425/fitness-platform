@@ -9,7 +9,7 @@ import { Exercise, MuscleGroup, ExerciseModality } from './entities/exercise.ent
 import { CreateExerciseDto } from './dto/create-exercise.dto';
 import { ExerciseFiltersDto } from './dto/exercise-filters.dto';
 
-interface PlateCalculationResult {
+export interface PlateCalculationResult {
   targetWeight: number;
   barWeight: number;
   perSide: number;

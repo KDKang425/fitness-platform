@@ -10,7 +10,7 @@ import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 
-interface Competition {
+export interface Competition {
   id: string;
   creatorId: number;
   type: 'volume' | 'sets' | 'time';
@@ -21,7 +21,7 @@ interface Competition {
   createdAt: Date;
 }
 
-interface LiveSession {
+export interface LiveSession {
   sessionId: number;
   startTime: Date;
 }
