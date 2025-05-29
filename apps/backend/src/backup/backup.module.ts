@@ -9,6 +9,7 @@ import { WorkoutSet } from '../workouts/entities/workout-set.entity';
 import { BodyRecord } from '../body-records/entities/body-record.entity';
 import { Routine } from '../routines/entities/routine.entity';
 import { PersonalRecord } from '../personal-records/entities/personal-record.entity';
+import { Exercise } from '../exercises/entities/exercise.entity';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { PersonalRecord } from '../personal-records/entities/personal-record.ent
       BodyRecord,
       Routine,
       PersonalRecord,
+      Exercise,
     ]),
     ExportModule,
   ],

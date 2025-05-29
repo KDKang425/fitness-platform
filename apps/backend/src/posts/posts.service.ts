@@ -1,9 +1,12 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { Like } from './entities/like.entity';
 import { CreatePostDto } from './dto/create-post.dto';
+import { User } from '../users/entities/user.entity';
+import { WorkoutSession } from '../workouts/entities/workout-session.entity';
+import { PersonalRecord } from '../personal-records/entities/personal-record.entity';
 
 @Injectable()
 export class PostsService {
@@ -12,6 +15,12 @@ export class PostsService {
     private readonly postRepo: Repository<Post>,
     @InjectRepository(Like)
     private readonly likeRepo: Repository<Like>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(WorkoutSession)
+    private readonly sessionRepo: Repository<WorkoutSession>,
+    @InjectRepository(PersonalRecord)
+    private readonly prRepo: Repository<PersonalRecord>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -85,6 +94,332 @@ export class PostsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async getPersonalizedFeed(
+    userId: number, 
+    page = 1, 
+    limit = 20,
+    algorithm: 'default' | 'engagement' | 'similarity' = 'default'
+  ) {
+    const skip = (page - 1) * limit;
+
+    switch (algorithm) {
+      case 'engagement':
+        return this.getEngagementBasedFeed(userId, skip, limit);
+      case 'similarity':
+        return this.getSimilarityBasedFeed(userId, skip, limit);
+      default:
+        return this.getDefaultPersonalizedFeed(userId, skip, limit);
+    }
+  }
+
+  private async getDefaultPersonalizedFeed(userId: number, skip: number, limit: number) {
+
+    const followingPosts = await this.getFollowingPosts(userId, Math.floor(limit * 0.5));
+    const similarUserPosts = await this.getSimilarUserPosts(userId, Math.floor(limit * 0.3));
+    const popularPosts = await this.getPopularPosts(Math.ceil(limit * 0.2), userId);
+
+    const seenIds = new Set<number>();
+    const combinedPosts = [];
+
+    for (const post of [...followingPosts, ...similarUserPosts, ...popularPosts]) {
+      if (!seenIds.has(post.id)) {
+        seenIds.add(post.id);
+        combinedPosts.push(post);
+      }
+    }
+
+    const scoredPosts = await this.scoreAndSortPosts(combinedPosts, userId);
+    const paginatedPosts = scoredPosts.slice(skip, skip + limit);
+
+    const total = await this.postRepo.count();
+
+    return {
+      posts: paginatedPosts,
+      pagination: {
+        page: Math.floor(skip / limit) + 1,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      algorithm: 'default',
+    };
+  }
+
+  private async getEngagementBasedFeed(userId: number, skip: number, limit: number) {
+    const userLikePattern = await this.analyzeUserLikePattern(userId);
+    
+    const query = this.postRepo.createQueryBuilder('post')
+      .leftJoinAndSelect('post.user', 'user')
+      .leftJoin('post.workoutSession', 'session')
+      .leftJoin('session.workoutSets', 'sets')
+      .leftJoin('sets.exercise', 'exercise')
+      .where('post.user.id != :userId', { userId });
+
+    if (userLikePattern.preferredExercises.length > 0) {
+      query.andWhere('exercise.id IN (:...exercises)', { 
+        exercises: userLikePattern.preferredExercises 
+      });
+    }
+
+    const posts = await query
+      .select([
+        'post.id',
+        'post.imageUrl',
+        'post.content',
+        'post.likesCount',
+        'post.createdAt',
+        'user.id',
+        'user.nickname',
+        'user.profileImageUrl',
+      ])
+      .orderBy('post.likesCount', 'DESC')
+      .addOrderBy('post.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getMany();
+
+    const total = await query.getCount();
+
+    return {
+      posts,
+      pagination: {
+        page: Math.floor(skip / limit) + 1,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      algorithm: 'engagement',
+    };
+  }
+
+  private async getSimilarityBasedFeed(userId: number, skip: number, limit: number) {
+    const userProfile = await this.getUserStrengthProfile(userId);
+    const similarUsers = await this.findSimilarUsers(userId, userProfile);
+
+    const posts = await this.postRepo.createQueryBuilder('post')
+      .leftJoinAndSelect('post.user', 'user')
+      .where('post.user.id IN (:...userIds)', { 
+        userIds: similarUsers.map(u => u.id) 
+      })
+      .select([
+        'post.id',
+        'post.imageUrl',
+        'post.content',
+        'post.likesCount',
+        'post.createdAt',
+        'user.id',
+        'user.nickname',
+        'user.profileImageUrl',
+      ])
+      .orderBy('post.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getMany();
+
+    const total = await this.postRepo.count({
+      where: { user: { id: In(similarUsers.map(u => u.id)) } }
+    });
+
+    return {
+      posts,
+      pagination: {
+        page: Math.floor(skip / limit) + 1,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      algorithm: 'similarity',
+    };
+  }
+
+  private async getFollowingPosts(userId: number, limit: number) {
+    return this.postRepo.createQueryBuilder('post')
+      .leftJoinAndSelect('post.user', 'user')
+      .innerJoin('user.followers', 'follow', 'follow.follower.id = :userId', { userId })
+      .select([
+        'post.id',
+        'post.imageUrl',
+        'post.content',
+        'post.likesCount',
+        'post.createdAt',
+        'user.id',
+        'user.nickname',
+        'user.profileImageUrl',
+      ])
+      .orderBy('post.createdAt', 'DESC')
+      .limit(limit)
+      .getMany();
+  }
+
+  private async getSimilarUserPosts(userId: number, limit: number) {
+    const userExercises = await this.sessionRepo
+      .createQueryBuilder('session')
+      .leftJoin('session.workoutSets', 'sets')
+      .leftJoin('sets.exercise', 'exercise')
+      .where('session.user.id = :userId', { userId })
+      .select('exercise.id', 'exerciseId')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('exercise.id')
+      .orderBy('count', 'DESC')
+      .limit(5)
+      .getRawMany();
+
+    const exerciseIds = userExercises.map(e => e.exerciseId);
+
+    if (exerciseIds.length === 0) {
+      return [];
+    }
+
+    return this.postRepo.createQueryBuilder('post')
+      .leftJoinAndSelect('post.user', 'user')
+      .leftJoin('post.workoutSession', 'session')
+      .leftJoin('session.workoutSets', 'sets')
+      .leftJoin('sets.exercise', 'exercise')
+      .where('exercise.id IN (:...exerciseIds)', { exerciseIds })
+      .andWhere('post.user.id != :userId', { userId })
+      .select([
+        'post.id',
+        'post.imageUrl',
+        'post.content',
+        'post.likesCount',
+        'post.createdAt',
+        'user.id',
+        'user.nickname',
+        'user.profileImageUrl',
+      ])
+      .orderBy('post.likesCount', 'DESC')
+      .limit(limit)
+      .getMany();
+  }
+
+  private async getPopularPosts(limit: number, excludeUserId?: number) {
+    const query = this.postRepo.createQueryBuilder('post')
+      .leftJoinAndSelect('post.user', 'user')
+      .where('post.createdAt >= :date', { 
+        date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
+      });
+
+    if (excludeUserId) {
+      query.andWhere('post.user.id != :userId', { userId: excludeUserId });
+    }
+
+    return query
+      .select([
+        'post.id',
+        'post.imageUrl',
+        'post.content',
+        'post.likesCount',
+        'post.createdAt',
+        'user.id',
+        'user.nickname',
+        'user.profileImageUrl',
+      ])
+      .orderBy('post.likesCount', 'DESC')
+      .limit(limit)
+      .getMany();
+  }
+
+  private async scoreAndSortPosts(posts: any[], userId: number) {
+    const scoredPosts = await Promise.all(posts.map(async (post) => {
+      let score = 0;
+
+      const ageInHours = (Date.now() - new Date(post.createdAt).getTime()) / (1000 * 60 * 60);
+      score += Math.max(0, 30 - ageInHours);
+
+      score += Math.min(40, post.likesCount * 2);
+
+      const isFollowing = await this.isUserFollowing(userId, post.user.id);
+      if (isFollowing) score += 30;
+
+      return { ...post, score };
+    }));
+
+    return scoredPosts.sort((a, b) => b.score - a.score);
+  }
+
+  private async analyzeUserLikePattern(userId: number) {
+    const likedPosts = await this.likeRepo.find({
+      where: { user: { id: userId } },
+      relations: ['post', 'post.workoutSession', 'post.workoutSession.workoutSets', 'post.workoutSession.workoutSets.exercise'],
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+
+    const exerciseFrequency = new Map<number, number>();
+    
+    for (const like of likedPosts) {
+      if (like.post.workoutSession?.workoutSets) {
+        for (const set of like.post.workoutSession.workoutSets) {
+          const count = exerciseFrequency.get(set.exercise.id) || 0;
+          exerciseFrequency.set(set.exercise.id, count + 1);
+        }
+      }
+    }
+
+    const preferredExercises = Array.from(exerciseFrequency.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([exerciseId]) => exerciseId);
+
+    return { preferredExercises };
+  }
+
+  private async getUserStrengthProfile(userId: number) {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      select: ['benchPress1RM', 'squat1RM', 'deadlift1RM'],
+    });
+
+    const prs = await this.prRepo.find({
+      where: { user: { id: userId } },
+      relations: ['exercise'],
+      order: { estimated1RM: 'DESC' },
+      take: 10,
+    });
+
+    return {
+      mainLifts: {
+        benchPress: user?.benchPress1RM || 0,
+        squat: user?.squat1RM || 0,
+        deadlift: user?.deadlift1RM || 0,
+      },
+      totalStrength: (user?.benchPress1RM || 0) + (user?.squat1RM || 0) + (user?.deadlift1RM || 0),
+      topExercises: prs.map(pr => ({
+        exerciseId: pr.exercise.id,
+        estimated1RM: pr.estimated1RM,
+      })),
+    };
+  }
+
+  private async findSimilarUsers(userId: number, userProfile: any) {
+    const tolerance = 0.2; 
+    const minStrength = userProfile.totalStrength * (1 - tolerance);
+    const maxStrength = userProfile.totalStrength * (1 + tolerance);
+
+    return this.userRepo
+      .createQueryBuilder('user')
+      .where('user.id != :userId', { userId })
+      .andWhere(
+        '(user.benchPress1RM + user.squat1RM + user.deadlift1RM) BETWEEN :min AND :max',
+        { min: minStrength, max: maxStrength }
+      )
+      .select(['user.id'])
+      .limit(50)
+      .getMany();
+  }
+
+  private async isUserFollowing(userId: number, targetId: number): Promise<boolean> {
+    const count = await this.dataSource
+      .getRepository('Follow')
+      .count({
+        where: { 
+          follower: { id: userId }, 
+          following: { id: targetId } 
+        }
+      });
+    return count > 0;
   }
 
   async likePost(userId: number, postId: number) {
@@ -184,38 +519,39 @@ export class PostsService {
   }
 
   async getFeedForUser(userId: number, onlyFollowing = false, page = 1, limit = 20) {
-    const query = this.postRepo.createQueryBuilder('post')
-      .leftJoinAndSelect('post.user', 'user')
-      .select([
-        'post.id',
-        'post.imageUrl',
-        'post.content',
-        'post.likesCount',
-        'post.createdAt',
-        'user.id',
-        'user.nickname',
-        'user.profileImageUrl',
-      ]);
-
     if (onlyFollowing) {
-      query.innerJoin('user.followers', 'follow', 'follow.follower.id = :userId', { userId });
+      const query = this.postRepo.createQueryBuilder('post')
+        .leftJoinAndSelect('post.user', 'user')
+        .innerJoin('user.followers', 'follow', 'follow.follower.id = :userId', { userId })
+        .select([
+          'post.id',
+          'post.imageUrl',
+          'post.content',
+          'post.likesCount',
+          'post.createdAt',
+          'user.id',
+          'user.nickname',
+          'user.profileImageUrl',
+        ]);
+
+      const skip = (page - 1) * limit;
+      const [posts, total] = await query
+        .orderBy('post.createdAt', 'DESC')
+        .skip(skip)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        posts,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } else {
+      return this.getPersonalizedFeed(userId, page, limit);
     }
-
-    const skip = (page - 1) * limit;
-    const [posts, total] = await query
-      .orderBy('post.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit)
-      .getManyAndCount();
-
-    return {
-      posts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
   }
 }

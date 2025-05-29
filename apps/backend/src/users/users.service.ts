@@ -13,6 +13,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InitialProfileDto } from './dto/initial-profile.dto';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
@@ -67,20 +68,36 @@ export class UsersService {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 24);
 
-    const cacheKey = `email-verify:${token}`;
-    await this.cacheManager.set(cacheKey, userId, 86400000);
-
+    // 토큰을 해시화하여 DB에 저장
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    
     await this.userRepo.update(userId, {
+      emailVerificationToken: hashedToken,
       emailVerificationExpiry: expiry,
     });
+
+    // 캐시에도 저장 (빠른 조회용)
+    const cacheKey = `email-verify:${token}`;
+    await this.cacheManager.set(cacheKey, userId, 86400000);
   }
 
   async verifyEmailToken(token: string) {
+    // 먼저 캐시에서 확인
     const cacheKey = `email-verify:${token}`;
-    const userId = await this.cacheManager.get<number>(cacheKey);
+    let userId = await this.cacheManager.get<number>(cacheKey);
 
     if (!userId) {
-      return null;
+      // 캐시에 없으면 DB에서 확인
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+      const user = await this.userRepo.findOne({ 
+        where: { 
+          emailVerificationToken: hashedToken,
+          emailVerificationExpiry: MoreThan(new Date())
+        } 
+      });
+      
+      if (!user) return null;
+      userId = user.id;
     }
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -90,8 +107,8 @@ export class UsersService {
 
     await this.userRepo.update(user.id, {
       emailVerified: true,
-      emailVerificationToken: undefined,
-      emailVerificationExpiry: undefined,
+      emailVerificationToken: null,
+      emailVerificationExpiry: null,
     });
 
     await this.cacheManager.del(cacheKey);
@@ -102,20 +119,36 @@ export class UsersService {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 1);
 
-    const cacheKey = `pwd-reset:${token}`;
-    await this.cacheManager.set(cacheKey, userId, 3600000);
-
+    // 토큰을 해시화하여 DB에 저장
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    
     await this.userRepo.update(userId, {
+      passwordResetToken: hashedToken,
       passwordResetExpiry: expiry,
     });
+
+    // 캐시에도 저장
+    const cacheKey = `pwd-reset:${token}`;
+    await this.cacheManager.set(cacheKey, userId, 3600000);
   }
 
   async verifyPasswordResetToken(token: string) {
+    // 먼저 캐시에서 확인
     const cacheKey = `pwd-reset:${token}`;
-    const userId = await this.cacheManager.get<number>(cacheKey);
+    let userId = await this.cacheManager.get<number>(cacheKey);
 
     if (!userId) {
-      return null;
+      // 캐시에 없으면 DB에서 확인
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+      const user = await this.userRepo.findOne({ 
+        where: { 
+          passwordResetToken: hashedToken,
+          passwordResetExpiry: MoreThan(new Date())
+        } 
+      });
+      
+      if (!user) return null;
+      userId = user.id;
     }
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -132,9 +165,13 @@ export class UsersService {
 
     await this.userRepo.update(userId, {
       password: hashedPassword,
-      passwordResetToken: undefined,
-      passwordResetExpiry: undefined,
+      passwordResetToken: null,
+      passwordResetExpiry: null,
     });
+
+    // 비밀번호 변경 시 모든 리프레시 토큰 무효화를 위한 캐시 클리어
+    const cacheKey = `refresh-tokens:${userId}`;
+    await this.cacheManager.del(cacheKey);
   }
 
   async updateFcmToken(userId: number, fcmToken: string) {
@@ -165,7 +202,7 @@ export class UsersService {
   async getProfile(userId: number) {
     const user = await this.userRepo.findOne({
       where: { id: userId },
-      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt', 'height', 'initialWeight', 'benchPress1RM', 'squat1RM', 'deadlift1RM', 'hasCompletedInitialSetup', 'notificationsEnabled'],
+      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt', 'height', 'initialWeight', 'benchPress1RM', 'squat1RM', 'deadlift1RM', 'overheadPress1RM', 'hasCompletedInitialSetup', 'notificationsEnabled', 'preferredUnit'],
     });
 
     if (!user) {
@@ -196,6 +233,7 @@ export class UsersService {
     user.squat1RM = dto.squat1RM;
     user.deadlift1RM = dto.deadlift1RM;
     user.overheadPress1RM = dto.overheadPress1RM;
+    user.preferredUnit = dto.preferredUnit || 'kg';
     
     if (dto.profileImageUrl) {
       user.profileImageUrl = dto.profileImageUrl;

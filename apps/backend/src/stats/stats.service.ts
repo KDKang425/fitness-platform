@@ -7,6 +7,7 @@ import { PersonalRecord } from '../personal-records/entities/personal-record.ent
 import { MuscleGroup } from '../exercises/entities/muscle-group.enum';
 import { Exercise } from '../exercises/entities/exercise.entity';
 import { User } from '../users/entities/user.entity';
+import { ProgressPeriod } from './dto/exercise-progress.dto';
 
 export interface StatsResponse {
   totalVolume: number;
@@ -174,6 +175,155 @@ export class StatsService {
     }));
   }
 
+  async getSpecificExerciseProgress(
+    userId: number,
+    exerciseId: number,
+    period: ProgressPeriod = ProgressPeriod.MONTH
+  ) {
+    let daysBack: number;
+    let groupBy: string;
+
+    switch (period) {
+      case ProgressPeriod.WEEK:
+        daysBack = 7;
+        groupBy = 'day';
+        break;
+      case ProgressPeriod.MONTH:
+        daysBack = 30;
+        groupBy = 'day';
+        break;
+      case ProgressPeriod.QUARTER:
+        daysBack = 90;
+        groupBy = 'week';
+        break;
+      case ProgressPeriod.YEAR:
+        daysBack = 365;
+        groupBy = 'month';
+        break;
+    }
+
+    const from = this.addDays(new Date(), -daysBack);
+
+    const data = await this.setRepo
+      .createQueryBuilder('set')
+      .leftJoin('set.workoutSession', 'session')
+      .where('session.user.id = :userId', { userId })
+      .andWhere('set.exercise.id = :exerciseId', { exerciseId })
+      .andWhere('session.startTime >= :from', { from })
+      .select([
+        `DATE_TRUNC('${groupBy}', session.startTime) as period`,
+        'MAX(set.weight) as maxWeight',
+        'AVG(set.weight) as avgWeight',
+        'MAX(set.weight * set.reps) as estimated1RM',
+        'SUM(set.volume) as totalVolume',
+        'COUNT(set.id) as setCount',
+      ])
+      .groupBy(`DATE_TRUNC('${groupBy}', session.startTime)`)
+      .orderBy(`DATE_TRUNC('${groupBy}', session.startTime)`, 'ASC')
+      .getRawMany();
+
+    return {
+      exerciseId,
+      period,
+      data: data.map(d => ({
+        period: d.period,
+        maxWeight: Number(d.maxWeight),
+        avgWeight: Math.round(Number(d.avgWeight) * 10) / 10,
+        estimated1RM: Math.round(Number(d.estimated1RM)),
+        totalVolume: Number(d.totalVolume),
+        setCount: Number(d.setCount),
+      })),
+    };
+  }
+
+  async get1RMProgressTrends(userId: number) {
+    const mainLifts = ['Barbell Bench Press', 'Barbell Squat', 'Deadlift', 'Overhead Press'];
+    const threeMonthsAgo = this.addDays(new Date(), -90);
+
+    const trends = {};
+
+    for (const liftName of mainLifts) {
+      const exercise = await this.exerciseRepo.findOne({ where: { name: liftName } });
+      if (!exercise) continue;
+
+      const data = await this.setRepo
+        .createQueryBuilder('set')
+        .leftJoin('set.workoutSession', 'session')
+        .where('session.user.id = :userId', { userId })
+        .andWhere('set.exercise.id = :exerciseId', { exerciseId: exercise.id })
+        .andWhere('session.startTime >= :from', { from: threeMonthsAgo })
+        .select([
+          'session.date as date',
+          'MAX(set.weight * (1 + set.reps / 30.0)) as estimated1RM',
+        ])
+        .groupBy('session.date')
+        .orderBy('session.date', 'ASC')
+        .getRawMany();
+
+      trends[liftName] = data.map(d => ({
+        date: d.date,
+        estimated1RM: Math.round(Number(d.estimated1RM)),
+      }));
+    }
+
+    return trends;
+  }
+
+  async getVolumeTrends(userId: number, period: 'week' | 'month', duration: number) {
+    const now = new Date();
+    const data = [];
+
+    for (let i = duration - 1; i >= 0; i--) {
+      let from: Date, to: Date;
+
+      if (period === 'week') {
+        to = this.addDays(now, -i * 7);
+        from = this.addDays(to, -6);
+      } else {
+        to = new Date(now.getFullYear(), now.getMonth() - i, 0);
+        from = new Date(to.getFullYear(), to.getMonth(), 1);
+      }
+
+      const volume = await this.sessionRepo
+        .createQueryBuilder('s')
+        .leftJoin('s.workoutSets', 'set')
+        .select('SUM(set.volume)', 'totalVolume')
+        .where('s.user.id = :userId', { userId })
+        .andWhere('s.startTime BETWEEN :from AND :to', { from, to })
+        .getRawOne();
+
+      data.push({
+        period: period === 'week' 
+          ? `Week ${duration - i}` 
+          : to.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short' }),
+        volume: Number(volume?.totalVolume) || 0,
+      });
+    }
+
+    const avgVolume = data.reduce((sum, d) => sum + d.volume, 0) / data.length;
+    const trend = this.calculateTrend(data.map(d => d.volume));
+
+    return {
+      data,
+      avgVolume: Math.round(avgVolume),
+      trend,
+      trendPercentage: Math.round(trend * 100) / 100,
+    };
+  }
+
+  private calculateTrend(values: number[]): number {
+    if (values.length < 2) return 0;
+
+    const n = values.length;
+    const sumX = (n * (n - 1)) / 2;
+    const sumY = values.reduce((sum, val) => sum + val, 0);
+    const sumXY = values.reduce((sum, val, i) => sum + val * i, 0);
+    const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    return slope;
+  }
+
   async getWorkoutFrequency(userId: number) {
     const thirtyDaysAgo = this.addDays(new Date(), -30);
 
@@ -297,7 +447,7 @@ export class StatsService {
     for (const [key, exerciseName] of Object.entries(mainLifts)) {
       const exercise = await this.exerciseRepo.findOne({
         where: { name: exerciseName },
-    });
+      });
 
       if (!exercise) {
         result[key] = null;
@@ -342,7 +492,7 @@ export class StatsService {
     }
 
     return result;
-}
+  }
 
   private startOfDay(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);

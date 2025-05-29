@@ -9,6 +9,21 @@ import { Exercise, MuscleGroup, ExerciseModality } from './entities/exercise.ent
 import { CreateExerciseDto } from './dto/create-exercise.dto';
 import { ExerciseFiltersDto } from './dto/exercise-filters.dto';
 
+interface PlateCalculationResult {
+  targetWeight: number;
+  barWeight: number;
+  perSide: number;
+  plates: number[];
+  totalPlates: number;
+  actualWeight: number;
+  difference: number;
+  alternativeSolutions?: {
+    plates: number[];
+    actualWeight: number;
+    difference: number;
+  }[];
+}
+
 @Injectable()
 export class ExercisesService {
   private readonly EXERCISE_VIDEOS = {
@@ -20,6 +35,28 @@ export class ExercisesService {
     'Barbell Row': 'https://youtube.com/watch?v=kBWAon7ItDw',
     'Bicep Curl': 'https://youtube.com/watch?v=ykJmrZ5v0Oo',
     'Triceps Push-down': 'https://youtube.com/watch?v=2-LAMcpzODU',
+  };
+
+  private readonly STANDARD_PLATES = {
+    kg: [25, 20, 15, 10, 5, 2.5, 1.25, 1, 0.5, 0.25],
+    lbs: [45, 35, 25, 10, 5, 2.5],
+  };
+
+  private readonly BAR_WEIGHTS = {
+    kg: {
+      standard: 20,
+      women: 15,
+      training: 10,
+      ez: 7,
+      dumbbell: 2.5,
+    },
+    lbs: {
+      standard: 45,
+      women: 35,
+      training: 25,
+      ez: 15,
+      dumbbell: 5,
+    },
   };
 
   private readonly cacheTTL: number;
@@ -186,39 +223,156 @@ export class ExercisesService {
     return result;
   }
 
-  async calculatePlates(targetWeight: number, barWeight = 20, availablePlates = [25, 20, 15, 10, 5, 2.5, 1.25]) {
+  async calculatePlates(
+    targetWeight: number, 
+    barWeight = 20, 
+    availablePlates?: number[],
+    unit: 'kg' | 'lbs' = 'kg'
+  ): Promise<PlateCalculationResult> {
     if (targetWeight < barWeight) {
-      throw new BadRequestException(`목표 무게는 최소 ${barWeight}kg (바벨 무게) 이상이어야 합니다.`);
+      throw new BadRequestException(`목표 무게는 최소 ${barWeight}${unit} (바벨 무게) 이상이어야 합니다.`);
     }
 
     const weightToLoad = targetWeight - barWeight;
     const perSide = weightToLoad / 2;
 
-    if (perSide % 0.25 !== 0) {
-      throw new BadRequestException('무게는 0.5kg 단위(양쪽 0.25kg)로 나누어떨어져야 합니다.');
-    }
+    const plates = availablePlates || this.STANDARD_PLATES[unit];
+    
+    const mainSolution = this.calculateOptimalPlates(perSide, plates);
+    
+    const alternatives = this.calculateAlternativeSolutions(
+      targetWeight, 
+      barWeight, 
+      plates, 
+      unit
+    );
 
+    const actualWeight = barWeight + (mainSolution.totalWeight * 2);
+    const difference = Math.abs(targetWeight - actualWeight);
+
+    return {
+      targetWeight,
+      barWeight,
+      perSide,
+      plates: mainSolution.plates,
+      totalPlates: mainSolution.plates.length * 2,
+      actualWeight,
+      difference,
+      alternativeSolutions: alternatives.length > 0 ? alternatives : undefined,
+    };
+  }
+
+  private calculateOptimalPlates(
+    targetPerSide: number, 
+    availablePlates: number[]
+  ): { plates: number[], totalWeight: number } {
     const plates: number[] = [];
-    let remaining = perSide;
+    let remaining = targetPerSide;
+    
+    const sortedPlates = [...availablePlates].sort((a, b) => b - a);
 
-    for (const plate of availablePlates.sort((a, b) => b - a)) {
+    for (const plate of sortedPlates) {
       while (remaining >= plate) {
         plates.push(plate);
         remaining -= plate;
       }
     }
 
-    if (remaining > 0.01) {
-      throw new BadRequestException('사용 가능한 플레이트로 정확한 무게를 만들 수 없습니다.');
+    const minPlate = sortedPlates[sortedPlates.length - 1];
+    if (remaining >= minPlate / 2) {
+      plates.push(minPlate);
+      remaining -= minPlate;
     }
 
-    return {
-      targetWeight,
-      barWeight,
-      perSide,
-      plates,
-      totalPlates: plates.length * 2,
+    const totalWeight = plates.reduce((sum, p) => sum + p, 0);
+
+    return { plates, totalWeight };
+  }
+
+  private calculateAlternativeSolutions(
+    targetWeight: number,
+    barWeight: number,
+    availablePlates: number[],
+    unit: 'kg' | 'lbs'
+  ): { plates: number[], actualWeight: number, difference: number }[] {
+    const alternatives: { plates: number[], actualWeight: number, difference: number }[] = [];
+    const range = unit === 'kg' ? 2.5 : 5;
+    
+    for (let offset = -range; offset <= range; offset += (unit === 'kg' ? 0.5 : 2.5)) {
+      if (offset === 0) continue; 
+      
+      const altTarget = targetWeight + offset;
+      if (altTarget < barWeight) continue;
+      
+      const altPerSide = (altTarget - barWeight) / 2;
+      const altSolution = this.calculateOptimalPlates(altPerSide, availablePlates);
+      const altActual = barWeight + (altSolution.totalWeight * 2);
+      
+      alternatives.push({
+        plates: altSolution.plates,
+        actualWeight: altActual,
+        difference: Math.abs(altTarget - altActual),
+      });
+    }
+
+    return alternatives
+      .sort((a, b) => a.difference - b.difference)
+      .slice(0, 3);
+  }
+
+  async calculateAllPlateCombinations(
+    targetWeight: number,
+    barWeight = 20,
+    availablePlates?: number[],
+    unit: 'kg' | 'lbs' = 'kg'
+  ) {
+    const plates = availablePlates || this.STANDARD_PLATES[unit];
+    const perSide = (targetWeight - barWeight) / 2;
+    
+    const combinations: number[][] = [];
+    
+    const findCombinations = (
+      remaining: number, 
+      currentCombo: number[], 
+      startIndex: number
+    ) => {
+      if (Math.abs(remaining) < 0.01) {
+        combinations.push([...currentCombo]);
+        return;
+      }
+      
+      if (remaining < 0 || startIndex >= plates.length) return;
+      
+      for (let count = 0; count <= Math.floor(remaining / plates[startIndex]); count++) {
+        const newCombo = [...currentCombo];
+        for (let i = 0; i < count; i++) {
+          newCombo.push(plates[startIndex]);
+        }
+        findCombinations(
+          remaining - (plates[startIndex] * count),
+          newCombo,
+          startIndex + 1
+        );
+      }
     };
+    
+    findCombinations(perSide, [], 0);
+    
+
+    const uniqueCombos = combinations
+      .map(combo => ({
+        plates: combo.sort((a, b) => b - a),
+        count: combo.length,
+        totalWeight: combo.reduce((sum, p) => sum + p, 0),
+      }))
+      .filter((combo, index, self) => 
+        index === self.findIndex(c => 
+          JSON.stringify(c.plates) === JSON.stringify(combo.plates)
+        )
+      )
+      .sort((a, b) => a.count - b.count);
+    
+    return uniqueCombos.slice(0, 5); 
   }
 
   private async invalidateCache() {

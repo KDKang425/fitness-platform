@@ -31,6 +31,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { BackupModule } from './backup/backup.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -129,6 +130,7 @@ import { BackupModule } from './backup/backup.module';
     WorkoutTemplatesModule,
     UserProgramsModule,
     BackupModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

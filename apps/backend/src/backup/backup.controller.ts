@@ -1,5 +1,5 @@
-import { Controller, Get, Post, UseGuards, Req, Res } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, UseGuards, Req, Res, Body } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Response } from 'express';
 import { AuthRequest } from '../common/interfaces/auth-request.interface';
@@ -25,6 +25,27 @@ export class BackupController {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(JSON.stringify(data, null, 2));
+  }
+
+  @ApiOperation({ summary: '백업 데이터 복원' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        version: { type: 'string' },
+        exportDate: { type: 'string' },
+        checksum: { type: 'string' },
+        user: { type: 'object' },
+        workoutSessions: { type: 'array' },
+        bodyRecords: { type: 'array' },
+        routines: { type: 'array' },
+        personalRecords: { type: 'array' },
+      },
+    },
+  })
+  @Post('restore')
+  async restoreBackup(@Req() req: AuthRequest, @Body() backupData: any) {
+    return this.backupService.restoreFromBackup(req.user.userId, backupData);
   }
 
   @ApiOperation({ summary: '클라우드 동기화 상태' })
