@@ -13,7 +13,7 @@ export default function SocialScreen({ navigation }: { navigation: any }) {
   const fetchPosts = async () => {
     setLoading(true)
     try {
-      const res = await api.get('/posts?sort=recent')
+      const res = await api.get('/posts/feed?filter=all')
       const list = (res.data.posts ?? []).map((p: any) => ({
         id: p.id,
         imageUrl: p.imageUrl,

@@ -16,7 +16,7 @@ export default function PostDetailScreen({ route }: { route: any }) {
       const res = await api.get(`/posts/${id}`)
       const p = res.data
       setPost({ imageUrl: p.imageUrl, caption: p.content })
-      setLiked(p.liked ?? p.isLiked ?? false)
+      setLiked(p.isLiked ?? false)
       setLikes(p.likesCount ?? 0)
     } catch {
       setPost({ imageUrl: `https://picsum.photos/id/${id}/600/600`, caption: '더미 게시글' })

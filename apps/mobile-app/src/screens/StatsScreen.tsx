@@ -14,8 +14,9 @@ export default function StatsScreen() {
   const fetchStats = async () => {
     setLoading(true)
     try {
-      const cur = await api.get(`/stats/${mode}`)
-      const prev = await api.get(`/stats/${mode}?prev=1`)
+      const apiPath = mode === 'week' ? 'weekly' : 'monthly'
+      const cur = await api.get(`/stats/${apiPath}`)
+      const prev = await api.get(`/stats/${apiPath}?prev=1`)
       setCurrent(cur.data)
       setPrevious(prev.data)
     } catch {

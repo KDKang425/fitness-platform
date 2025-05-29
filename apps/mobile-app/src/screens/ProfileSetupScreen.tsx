@@ -18,7 +18,7 @@ export default function ProfileSetupScreen({ navigation }: { navigation: any }) 
         squat_1rm: Number(squat),
         deadlift_1rm: Number(deadlift),
       })
-      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] })
+      navigation.goBack()
     } catch {
     }
   }

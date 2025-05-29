@@ -13,7 +13,7 @@ export default function RoutineDetailScreen({ route }: { route: any }) {
     try {
       const res = await api.get(`/routines/${id}`)
       setData(res.data)
-      setSubscribed(res.data.subscribed)
+      setSubscribed(res.data.isSubscribed)
     } catch {
       setData({
         title: '더미 루틴',
@@ -31,7 +31,7 @@ export default function RoutineDetailScreen({ route }: { route: any }) {
 
   const onSubscribe = async () => {
     try {
-      await api.post(`/programs/${id}/subscribe`)
+      await api.post(`/routine-subscriptions/${id}`)
     } catch {}
     setSubscribed(true)
   }
