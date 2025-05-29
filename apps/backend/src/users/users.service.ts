@@ -5,8 +5,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
+import { Repository, MoreThan } from 'typeorm';
+import { User, UserRole } from './entities/user.entity';
 import { Follow } from './entities/follow.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -57,6 +57,81 @@ export class UsersService {
     }
   }
 
+  async saveVerificationToken(userId: number, token: string) {
+    const expiry = new Date();
+    expiry.setHours(expiry.getHours() + 24);
+
+    await this.userRepo.update(userId, {
+      emailVerificationToken: token,
+      emailVerificationExpiry: expiry,
+    });
+  }
+
+  async verifyEmailToken(token: string) {
+    const user = await this.userRepo.findOne({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpiry: MoreThan(new Date()),
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    await this.userRepo.update(user.id, {
+      emailVerified: true,
+      emailVerificationToken: undefined,
+      emailVerificationExpiry: undefined,
+    });
+
+    return user;
+  }
+
+  async savePasswordResetToken(userId: number, token: string) {
+    const expiry = new Date();
+    expiry.setHours(expiry.getHours() + 1);
+
+    await this.userRepo.update(userId, {
+      passwordResetToken: token,
+      passwordResetExpiry: expiry,
+    });
+  }
+
+  async verifyPasswordResetToken(token: string) {
+    const user = await this.userRepo.findOne({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpiry: MoreThan(new Date()),
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return user;
+  }
+
+  async updatePassword(userId: number, newPassword: string) {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await this.userRepo.update(userId, {
+      password: hashedPassword,
+      passwordResetToken: undefined,
+      passwordResetExpiry: undefined,
+    });
+  }
+
+  async updateFcmToken(userId: number, fcmToken: string) {
+    await this.userRepo.update(userId, { fcmToken });
+  }
+
+  async toggleNotifications(userId: number, enabled: boolean) {
+    await this.userRepo.update(userId, { notificationsEnabled: enabled });
+  }
+
   async findByEmail(email: string) {
     return this.userRepo.findOne({ where: { email } });
   }
@@ -64,7 +139,7 @@ export class UsersService {
   async findOne(id: number) {
     const user = await this.userRepo.findOne({
       where: { id },
-      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt', 'hasCompletedInitialSetup'],
+      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt', 'hasCompletedInitialSetup', 'role', 'emailVerified'],
     });
 
     if (!user) {
@@ -77,7 +152,7 @@ export class UsersService {
   async getProfile(userId: number) {
     const user = await this.userRepo.findOne({
       where: { id: userId },
-      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt', 'height', 'initialWeight', 'benchPress1RM', 'squat1RM', 'deadlift1RM', 'hasCompletedInitialSetup'],
+      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt', 'height', 'initialWeight', 'benchPress1RM', 'squat1RM', 'deadlift1RM', 'hasCompletedInitialSetup', 'notificationsEnabled'],
     });
 
     if (!user) {
@@ -321,5 +396,13 @@ export class UsersService {
       where: { follower: { id: followerId }, following: { id: followingId } },
     });
     return count > 0;
+  }
+
+  async isAdmin(userId: number): Promise<boolean> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      select: ['role'],
+    });
+    return user?.role === UserRole.ADMIN;
   }
 }

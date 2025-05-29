@@ -6,13 +6,14 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
-
-// 이미 만들어진 UsersModule, UsersService를 사용 (이 모듈에서 이메일/비번 검증)
 import { UsersModule } from 'src/users/users.module';
+import { EmailModule } from 'src/email/email.module';
+import { EmailVerificationProcessor } from './email-verification.processor';
 
 @Module({
   imports: [
     UsersModule,
+    EmailModule,
     ConfigModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
 
@@ -26,7 +27,7 @@ import { UsersModule } from 'src/users/users.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
+  providers: [AuthService, LocalStrategy, JwtStrategy, EmailVerificationProcessor],
   exports: [AuthService],
 })
 export class AuthModule {}

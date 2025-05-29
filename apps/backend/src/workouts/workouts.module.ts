@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkoutsController } from './workouts.controller';
 import { WorkoutsService } from './workouts.service';
+import { WorkoutsGateway } from './workouts.gateway';
 import { WorkoutSession } from './entities/workout-session.entity';
 import { WorkoutSet } from './entities/workout-set.entity';
 import { Exercise } from '../exercises/entities/exercise.entity';
@@ -19,7 +20,7 @@ import { PersonalRecordsModule } from '../personal-records/personal-records.modu
     PersonalRecordsModule,
   ],
   controllers: [WorkoutsController],
-  providers: [WorkoutsService],
+  providers: [WorkoutsService, WorkoutsGateway],
   exports: [WorkoutsService],
 })
 export class WorkoutsModule {}

@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Cache } from 'cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
 import { Exercise, MuscleGroup, ExerciseModality } from './entities/exercise.entity';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
 import { ExerciseFiltersDto } from './dto/exercise-filters.dto';
@@ -10,6 +13,7 @@ export class ExercisesService {
   constructor(
     @InjectRepository(Exercise)
     private readonly exerciseRepo: Repository<Exercise>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async create(dto: CreateExerciseDto) {
@@ -31,7 +35,9 @@ export class ExercisesService {
     });
 
     try {
-      return await this.exerciseRepo.save(exercise);
+      const saved = await this.exerciseRepo.save(exercise);
+      await this.cacheManager.del('exercises:all');
+      return saved;
     } catch (error: any) {
       if (error?.code === '23505') {
         throw new ConflictException('Exercise name must be unique');
@@ -41,16 +47,31 @@ export class ExercisesService {
   }
 
   async findOne(id: number) {
+    const cacheKey = `exercise:${id}`;
+    const cached = await this.cacheManager.get<Exercise>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+
     const exercise = await this.exerciseRepo.findOne({ where: { id } });
     
     if (!exercise) {
       throw new NotFoundException(`Exercise with ID ${id} not found`);
     }
     
+    await this.cacheManager.set(cacheKey, exercise, 3600);
     return exercise;
   }
 
   async findAll(filters?: ExerciseFiltersDto) {
+    const cacheKey = `exercises:${JSON.stringify(filters || {})}`;
+    const cached = await this.cacheManager.get(cacheKey);
+    
+    if (cached && !filters) {
+      return cached;
+    }
+
     const query = this.exerciseRepo.createQueryBuilder('exercise');
 
     if (filters?.muscleGroup) {
@@ -85,7 +106,7 @@ export class ExercisesService {
       
       const [exercises, total] = await query.getManyAndCount();
       
-      return {
+      const result = {
         exercises,
         pagination: {
           page: filters.page,
@@ -94,9 +115,16 @@ export class ExercisesService {
           totalPages: Math.ceil(total / filters.limit),
         },
       };
+
+      await this.cacheManager.set(cacheKey, result, 1800);
+      return result;
     }
 
-    return query.getMany();
+    const result = await query.getMany();
+    if (!filters) {
+      await this.cacheManager.set(cacheKey, result, 3600);
+    }
+    return result;
   }
 
   async getLastRecords(userId: number, exerciseId: number, limit = 5) {

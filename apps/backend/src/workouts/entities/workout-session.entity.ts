@@ -6,6 +6,7 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { Routine } from 'src/routines/entities/routine.entity';
@@ -13,6 +14,8 @@ import { WorkoutSet } from 'src/workouts/entities/workout-set.entity';
 import { Post } from 'src/posts/entities/post.entity';
 
 @Entity('workout_sessions')
+@Index(['user', 'date'])
+@Index(['user', 'startTime'])
 export class WorkoutSession {
   @PrimaryGeneratedColumn()
   id: number;

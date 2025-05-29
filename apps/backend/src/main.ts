@@ -1,17 +1,34 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import './config/typeorm.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api');
+  
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
+  
+  app.use(helmet());
+  
+  app.use(
+    rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 100,
+      message: 'Too many requests from this IP, please try again later.',
+    }),
+  );
   
   app.useGlobalFilters(new HttpExceptionFilter());
   
@@ -21,7 +38,8 @@ async function bootstrap() {
     new ValidationPipe({
       transform: true,                    
       transformOptions: {
-        enableImplicitConversion: true,   
+        enableImplicitConversion: true,
+        excludeExtraneousValues: true,
       },
       whitelist: true,                   
       forbidNonWhitelisted: true,        
@@ -30,10 +48,11 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: configService.get('CORS_ORIGIN', '*'),
+    origin: configService.get('CORS_ORIGIN', ['http://localhost:3000']),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400,
   });
 
   const swaggerConfig = new DocumentBuilder()
@@ -58,6 +77,7 @@ async function bootstrap() {
     .addTag('routines', '루틴 관련 API')
     .addTag('stats', '통계 관련 API')
     .addTag('posts', '피드 관련 API')
+    .addTag('upload', '파일 업로드 API')
     .build();
 
   const swaggerDoc = SwaggerModule.createDocument(app, swaggerConfig);

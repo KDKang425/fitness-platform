@@ -10,6 +10,12 @@ import { Follow } from 'src/users/entities/follow.entity';
 import { BodyRecord } from 'src/body-records/entities/body-record.entity';
 import { RoutineSubscription } from '../../routine-subscriptions/entities/routine-subscription.entity';
 import { PersonalRecord } from '../../personal-records/entities/personal-record.entity';
+import { Notification } from '../../notification/entities/notification.entity';
+
+export enum UserRole {
+  USER = 'user',
+  ADMIN = 'admin',
+}
 
 @Entity('users')
 @Unique('users_email_key', ['email'])         
@@ -48,6 +54,34 @@ export class User {
   @Column({ default: false })
   hasCompletedInitialSetup: boolean;
 
+  @Column({ default: false })
+  emailVerified: boolean;
+
+  @Column({ nullable: true })
+  emailVerificationToken?: string;
+
+  @Column({ nullable: true })
+  emailVerificationExpiry?: Date;
+
+  @Column({ nullable: true })
+  passwordResetToken?: string;
+
+  @Column({ nullable: true })
+  passwordResetExpiry?: Date;
+
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
+
+  @Column({ nullable: true })
+  fcmToken?: string;
+
+  @Column({ default: true })
+  notificationsEnabled: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -79,5 +113,8 @@ export class User {
   routineSubscriptions: RoutineSubscription[];
 
   @OneToMany(() => PersonalRecord, (pr) => pr.user)
-  personalRecords: PersonalRecord[];  
+  personalRecords: PersonalRecord[];
+
+  @OneToMany(() => Notification, (notification) => notification.user)
+  notifications: Notification[];
 }
