@@ -10,6 +10,7 @@ import { User } from './entities/user.entity';
 import { Follow } from './entities/follow.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { InitialProfileDto } from './dto/initial-profile.dto';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -63,7 +64,7 @@ export class UsersService {
   async findOne(id: number) {
     const user = await this.userRepo.findOne({
       where: { id },
-      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt'],
+      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt', 'hasCompletedInitialSetup'],
     });
 
     if (!user) {
@@ -76,7 +77,7 @@ export class UsersService {
   async getProfile(userId: number) {
     const user = await this.userRepo.findOne({
       where: { id: userId },
-      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt'],
+      select: ['id', 'email', 'nickname', 'profileImageUrl', 'createdAt', 'height', 'initialWeight', 'benchPress1RM', 'squat1RM', 'deadlift1RM', 'hasCompletedInitialSetup'],
     });
 
     if (!user) {
@@ -93,6 +94,24 @@ export class UsersService {
       followerCount,
       followingCount,
     };
+  }
+
+  async setInitialProfile(userId: number, dto: InitialProfileDto) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    user.height = dto.height;
+    user.initialWeight = dto.weight;
+    user.benchPress1RM = dto.benchPress1RM;
+    user.squat1RM = dto.squat1RM;
+    user.deadlift1RM = dto.deadlift1RM;
+    user.hasCompletedInitialSetup = true;
+
+    const updated = await this.userRepo.save(user);
+    const { password, ...result } = updated;
+    return result;
   }
 
   async updateProfile(userId: number, dto: UpdateUserDto) {
@@ -195,6 +214,38 @@ export class UsersService {
     }
     
     return { success: true, message: 'Successfully unfollowed user' };
+  }
+
+  async getFriends(userId: number) {
+    const mutualFollows = await this.followRepo
+      .createQueryBuilder('f1')
+      .innerJoin('follows', 'f2', 'f1.follower_id = f2.following_id AND f1.following_id = f2.follower_id')
+      .leftJoinAndSelect('f1.following', 'friend')
+      .where('f1.follower_id = :userId', { userId })
+      .select([
+        'f1.id',
+        'f1.createdAt',
+        'friend.id',
+        'friend.nickname',
+        'friend.profileImageUrl',
+      ])
+      .getMany();
+
+    return {
+      friends: mutualFollows.map(f => ({
+        id: f.following.id,
+        nickname: f.following.nickname,
+        profileImageUrl: f.following.profileImageUrl,
+        friendsSince: f.createdAt,
+      })),
+      total: mutualFollows.length,
+    };
+  }
+
+  async addFriend(userId: number, targetId: number) {
+    await this.followUser(userId, targetId);
+    await this.followUser(targetId, userId);
+    return { success: true, message: '친구 추가 완료' };
   }
 
   async getFollowers(userId: number, page = 1, limit = 20) {

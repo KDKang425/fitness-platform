@@ -14,6 +14,7 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { InitialProfileDto } from './dto/initial-profile.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthRequest } from '../common/interfaces/auth-request.interface';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -47,6 +48,15 @@ export class UsersController {
   @Put('profile')
   async updateProfile(@Req() req: AuthRequest, @Body() dto: UpdateUserDto) {
     return this.usersService.updateProfile(req.user.userId, dto);
+  }
+
+  @ApiOperation({ summary: '초기 프로필 설정' })
+  @ApiResponse({ status: 200, description: '초기 프로필이 성공적으로 설정됨' })
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Post('profile/initial')
+  async setInitialProfile(@Req() req: AuthRequest, @Body() dto: InitialProfileDto) {
+    return this.usersService.setInitialProfile(req.user.userId, dto);
   }
 
   @ApiOperation({ summary: '사용자 조회' })
@@ -98,6 +108,27 @@ export class UsersController {
     @Param('targetId', ParseIntPipe) targetId: number,
   ) {
     return this.usersService.unfollowUser(req.user.userId, targetId);
+  }
+
+  @ApiOperation({ summary: '친구 목록 조회' })
+  @ApiResponse({ status: 200, description: '친구 목록 반환' })
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Get('friends')
+  async getFriends(@Req() req: AuthRequest) {
+    return this.usersService.getFriends(req.user.userId);
+  }
+
+  @ApiOperation({ summary: '친구 추가' })
+  @ApiResponse({ status: 201, description: '친구 추가 성공' })
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Post('friends/add/:targetId')
+  async addFriend(
+    @Req() req: AuthRequest,
+    @Param('targetId', ParseIntPipe) targetId: number,
+  ) {
+    return this.usersService.addFriend(req.user.userId, targetId);
   }
 
   @ApiOperation({ summary: '팔로워 목록 조회' })

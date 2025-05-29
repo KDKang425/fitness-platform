@@ -21,6 +21,21 @@ export interface MuscleHeatmapData {
   data: { date: string; volume: number }[];
 }
 
+const MUSCLE_VISUALIZATION_MAP = {
+  CHEST: { x: 50, y: 30, size: 'large', front: true },
+  BACK: { x: 50, y: 35, size: 'large', front: false },
+  SHOULDER: { x: 35, y: 25, size: 'medium', front: true },
+  TRICEPS: { x: 30, y: 40, size: 'small', front: false },
+  BICEPS: { x: 30, y: 40, size: 'small', front: true },
+  FOREARM: { x: 25, y: 50, size: 'small', front: true },
+  ABS: { x: 50, y: 45, size: 'medium', front: true },
+  GLUTES: { x: 50, y: 55, size: 'medium', front: false },
+  HAMSTRING: { x: 45, y: 65, size: 'medium', front: false },
+  QUADRICEPS: { x: 45, y: 60, size: 'large', front: true },
+  TRAPS: { x: 50, y: 20, size: 'medium', front: false },
+  CALVES: { x: 45, y: 80, size: 'small', front: false },
+};
+
 @Injectable()
 export class StatsService {
   constructor(
@@ -53,44 +68,44 @@ export class StatsService {
   }
 
   private async computeStats(
-    userId: number,
-    curFrom: Date,
-    curTo: Date,
-    prevFrom: Date,
-    prevTo: Date,
-  ): Promise<StatsResponse> {
-    const [curData, curSessions] = await Promise.all([
-      this.queryMuscleVolume(userId, curFrom, curTo),
-      this.sessionRepo.count({
-        where: {
-          user: { id: userId },
-          startTime: Between(curFrom, curTo),
-        },
-      }),
-    ]);
+  userId: number,
+  curFrom: Date,
+  curTo: Date,
+  prevFrom: Date,
+  prevTo: Date,
+): Promise<StatsResponse> {
+  const [curData, curSessions] = await Promise.all([
+    this.queryMuscleVolume(userId, curFrom, curTo),
+    this.sessionRepo.count({
+      where: {
+        user: { id: userId },
+        startTime: Between(curFrom, curTo),
+      },
+    }),
+  ]);
 
-    const curTotal = curData.reduce((s, d) => s + d.volume, 0);
+  const curTotal = curData.reduce((s, d) => s + d.volume, 0);
 
-    const prevData = await this.queryMuscleVolume(userId, prevFrom, prevTo);
-    const prevTotal = prevData.reduce((s, d) => s + d.volume, 0);
+  const prevData = await this.queryMuscleVolume(userId, prevFrom, prevTo);
+  const prevTotal = prevData.reduce((s, d) => s + d.volume, 0);
 
-    const diff = prevTotal === 0 ? 100 : ((curTotal - prevTotal) / prevTotal) * 100;
+  const diff = prevTotal === 0 ? 100 : ((curTotal - prevTotal) / prevTotal) * 100;
 
-    const perMuscleGroup = curData.map(item => ({
-      muscle_group: item.muscle_group,
-      volume: item.volume,
-      percentage: curTotal > 0 ? Math.round((item.volume / curTotal) * 100) : 0,
-    }));
+  const perMuscleGroup = curData.map(item => ({
+    muscle_group: item.muscle_group,
+    volume: item.volume,
+    percentage: curTotal > 0 ? Math.round((item.volume / curTotal) * 100) : 0,
+  }));
 
-    return {
-      totalVolume: curTotal,
-      perMuscleGroup,
-      prevTotalVolume: prevTotal,
-      diffPercent: Math.round(diff * 10) / 10,
-      sessionCount: curSessions,
-      avgVolumePerSession: curSessions > 0 ? Math.round(curTotal / curSessions) : 0,
-    };
-  }
+  return {
+    totalVolume: curTotal,
+    perMuscleGroup,
+    prevTotalVolume: prevTotal,
+    diffPercent: Math.round(diff * 10) / 10,
+    sessionCount: curSessions,
+    avgVolumePerSession: curSessions > 0 ? Math.round(curTotal / curSessions) : 0,
+  };
+}
 
   private async queryMuscleVolume(userId: number, from: Date, to: Date) {
     const result = await this.sessionRepo
@@ -193,42 +208,42 @@ export class StatsService {
   }
 
   async getMuscleHeatmap(userId: number): Promise<MuscleHeatmapData[]> {
-    const thirtyDaysAgo = this.addDays(new Date(), -30);
+  const thirtyDaysAgo = this.addDays(new Date(), -30);
 
-    const data = await this.sessionRepo
-      .createQueryBuilder('s')
-      .leftJoin('s.workoutSets', 'set')
-      .leftJoin('set.exercise', 'ex')
-      .select('DATE(s.startTime)', 'date')
-      .addSelect('ex.category', 'muscle')
-      .addSelect('SUM(set.volume)', 'volume')
-      .where('s.user.id = :uid', { uid: userId })
-      .andWhere('s.startTime >= :from', { from: thirtyDaysAgo })
-      .groupBy('DATE(s.startTime)')
-      .addGroupBy('ex.category')
-      .getRawMany();
+  const data = await this.sessionRepo
+    .createQueryBuilder('s')
+    .leftJoin('s.workoutSets', 'set')
+    .leftJoin('set.exercise', 'ex')
+    .select('DATE(s.startTime)', 'date')
+    .addSelect('ex.category', 'muscle')
+    .addSelect('SUM(set.volume)', 'volume')
+    .where('s.user.id = :uid', { uid: userId })
+    .andWhere('s.startTime >= :from', { from: thirtyDaysAgo })
+    .groupBy('DATE(s.startTime)')
+    .addGroupBy('ex.category')
+    .getRawMany();
 
-    const muscleGroups = Object.values(MuscleGroup);
-    const heatmapData: MuscleHeatmapData[] = [];
+  const muscleGroups = Object.values(MuscleGroup);
+  const heatmapData: MuscleHeatmapData[] = [];
 
-    for (const muscle of muscleGroups) {
-      const muscleData = data
-        .filter(d => d.muscle === muscle)
-        .map(d => ({
-          date: d.date,
-          volume: Number(d.volume) || 0,
-        }));
+  for (const muscle of muscleGroups) {
+    const muscleData = data
+      .filter(d => d.muscle === muscle)
+      .map(d => ({
+        date: d.date,
+        volume: Number(d.volume) || 0,
+      }));
 
-      if (muscleData.length > 0) {
-        heatmapData.push({
-          muscle,
-          data: muscleData,
-        });
-      }
+    if (muscleData.length > 0) {
+      heatmapData.push({
+        muscle,
+        data: muscleData,
+      });
     }
-
-    return heatmapData;
   }
+
+  return heatmapData;
+}
 
   async getDashboardStats(userId: number) {
     const [prs, recentSessions, monthlyVolume] = await Promise.all([

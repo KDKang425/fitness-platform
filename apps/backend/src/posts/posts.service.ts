@@ -60,7 +60,11 @@ export class PostsService {
       ]);
 
     if (sort === 'popular') {
-      query.orderBy('post.likesCount', 'DESC')
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      query.where('post.createdAt >= :date', { date: oneWeekAgo })
+        .orderBy('post.likesCount', 'DESC')
         .addOrderBy('post.createdAt', 'DESC');
     } else {
       query.orderBy('post.createdAt', 'DESC');

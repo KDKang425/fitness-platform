@@ -9,6 +9,7 @@ import {
   UseGuards,
   Req,
   Query,
+  Delete,
 } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { CreateWorkoutSessionDto } from './dto/create-workout-session.dto';
@@ -93,5 +94,36 @@ export class WorkoutsController {
   @Get('today/stats')
   getTodayStats(@Req() req: AuthRequest) {
     return this.workoutsService.getTodayStats(req.user.userId);
+  }
+
+  @ApiOperation({ summary: '월별 운동 달력' })
+  @ApiResponse({ status: 200, description: '월별 운동 달력 데이터 반환' })
+  @Get('calendar/:year/:month')
+  async getMonthlyCalendar(
+    @Req() req: AuthRequest,
+    @Param('year', ParseIntPipe) year: number,
+    @Param('month', ParseIntPipe) month: number
+  ) {
+    return this.workoutsService.getMonthlyCalendar(req.user.userId, year, month);
+  }
+
+  @ApiOperation({ summary: '수동 운동 기록 추가' })
+  @ApiResponse({ status: 201, description: '운동 기록이 성공적으로 추가됨' })
+  @Post('manual')
+  async addManualWorkout(
+    @Req() req: AuthRequest,
+    @Body() dto: any
+  ) {
+    return this.workoutsService.addManualWorkout(req.user.userId, dto);
+  }
+
+  @ApiOperation({ summary: '운동 세트 삭제' })
+  @ApiResponse({ status: 200, description: '세트가 성공적으로 삭제됨' })
+  @Delete('sets/:setId')
+  async deleteSet(
+    @Req() req: AuthRequest,
+    @Param('setId', ParseIntPipe) setId: number
+  ) {
+    return this.workoutsService.deleteSet(req.user.userId, setId);
   }
 }

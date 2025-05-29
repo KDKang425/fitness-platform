@@ -30,6 +30,24 @@ export class User {
   @Column({ nullable: true, length: 255 })
   profileImageUrl?: string;
 
+  @Column({ nullable: true })
+  height?: number;
+
+  @Column({ nullable: true })
+  initialWeight?: number;
+
+  @Column({ nullable: true })
+  benchPress1RM?: number;
+
+  @Column({ nullable: true })
+  squat1RM?: number;
+
+  @Column({ nullable: true })
+  deadlift1RM?: number;
+
+  @Column({ default: false })
+  hasCompletedInitialSetup: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

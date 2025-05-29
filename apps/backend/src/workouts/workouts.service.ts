@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Between, MoreThanOrEqual, IsNull } from 'typeorm';
@@ -241,5 +242,105 @@ export class WorkoutsService {
       totalTime,
       avgTimePerSession: sessions.length > 0 ? Math.round(totalTime / sessions.length) : 0,
     };
+  }
+
+  async getMonthlyCalendar(userId: number, year: number, month: number) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const sessions = await this.sessionRepo.find({
+      where: {
+        user: { id: userId },
+        date: Between(
+          startDate.toISOString().split('T')[0],
+          endDate.toISOString().split('T')[0]
+        ),
+      },
+      relations: ['workoutSets'],
+      order: { date: 'ASC' },
+    });
+
+    const calendar = sessions.map(session => ({
+      date: session.date,
+      hasWorkout: true,
+      totalVolume: session.totalVolume,
+      exerciseCount: new Set(session.workoutSets?.map(set => set.exercise.id)).size,
+      setCount: session.workoutSets?.length || 0,
+      duration: session.totalTime,
+    }));
+
+    const summary = {
+      year,
+      month,
+      totalSessions: sessions.length,
+      totalVolume: sessions.reduce((sum, s) => sum + s.totalVolume, 0),
+      totalSets: sessions.reduce((sum, s) => sum + (s.workoutSets?.length || 0), 0),
+    };
+
+    return {
+      calendar,
+      summary,
+    };
+  }
+
+  async addManualWorkout(userId: number, dto: any) {
+    const session = await this.sessionRepo.save({
+      user: { id: userId } as any,
+      date: dto.date || new Date().toISOString().split('T')[0],
+      startTime: new Date(dto.date + ' ' + dto.startTime),
+      endTime: new Date(dto.date + ' ' + dto.endTime),
+      totalTime: dto.duration || 0,
+      totalVolume: 0,
+    });
+
+    let totalVolume = 0;
+    for (const exercise of dto.exercises) {
+      for (const set of exercise.sets) {
+        const volume = calcVolume(set.reps, set.weight);
+        totalVolume += volume;
+        
+        await this.setRepo.save({
+          workoutSession: session,
+          exercise: { id: exercise.exerciseId } as any,
+          setNumber: set.setNumber,
+          reps: set.reps,
+          weight: set.weight,
+          volume,
+        });
+
+        await this.prSvc.updateRecord(userId, exercise.exerciseId, set.weight, set.reps);
+      }
+    }
+
+    session.totalVolume = totalVolume;
+    return this.sessionRepo.save(session);
+  }
+
+  async deleteSet(userId: number, setId: number) {
+    const set = await this.setRepo.findOne({
+      where: { id: setId },
+      relations: ['workoutSession', 'workoutSession.user'],
+    });
+
+    if (!set) throw new NotFoundException('Set not found');
+    if (set.workoutSession.user.id !== userId) {
+      throw new ForbiddenException('권한이 없습니다.');
+    }
+    if (set.workoutSession.endTime) {
+      throw new BadRequestException('종료된 세션의 세트는 삭제할 수 없습니다.');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(WorkoutSet, { id: setId });
+      
+      await manager.decrement(
+        WorkoutSession,
+        { id: set.workoutSession.id },
+        'totalVolume',
+        set.volume
+      );
+    });
+
+    return { success: true, message: 'Set deleted successfully' };
   }
 }

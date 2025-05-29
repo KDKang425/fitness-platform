@@ -29,7 +29,6 @@ async function bootstrap() {
     }),
   );
 
-  // CORS 설정
   app.enableCors({
     origin: configService.get('CORS_ORIGIN', '*'),
     credentials: true,
@@ -37,7 +36,6 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // Swagger 설정
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Fitness Platform API')
     .setDescription('피트니스 플랫폼 API 문서')
@@ -69,7 +67,6 @@ async function bootstrap() {
     },
   });
 
-  // 서버 시작
   const port = configService.get<number>('port', 3001);
   await app.listen(port);
   console.log(`🚀 Server is running on http://localhost:${port}`);

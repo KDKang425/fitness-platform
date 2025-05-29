@@ -33,7 +33,7 @@ export class ExercisesService {
     try {
       return await this.exerciseRepo.save(exercise);
     } catch (error: any) {
-      if (error?.code === '23505') { // PostgreSQL unique violation
+      if (error?.code === '23505') {
         throw new ConflictException('Exercise name must be unique');
       }
       throw error;
@@ -102,16 +102,43 @@ export class ExercisesService {
   async getLastRecords(userId: number, exerciseId: number, limit = 5) {
     const records = await this.exerciseRepo
       .createQueryBuilder('exercise')
-      .leftJoinAndSelect('exercise.workoutSets', 'set')
-      .leftJoinAndSelect('set.workoutSession', 'session')
+      .leftJoin('workout_sets', 'set', 'set.exercise_id = exercise.id')
+      .leftJoin('workout_sessions', 'session', 'session.id = set.workout_session_id')
       .where('exercise.id = :exerciseId', { exerciseId })
-      .andWhere('session.user.id = :userId', { userId })
+      .andWhere('session.user_id = :userId', { userId })
+      .select([
+        'session.date as date',
+        'set.set_number as set_number',
+        'set.reps as reps',
+        'set.weight as weight',
+        'set.volume as volume'
+      ])
       .orderBy('session.date', 'DESC')
-      .addOrderBy('set.setNumber', 'ASC')
-      .limit(limit)
-      .getMany();
+      .addOrderBy('set.set_number', 'ASC')
+      .limit(limit * 5)
+      .getRawMany();
 
-    return records;
+    const groupedByDate = records.reduce((acc, record) => {
+      if (!acc[record.date]) {
+        acc[record.date] = [];
+      }
+      acc[record.date].push({
+        setNumber: record.set_number,
+        reps: record.reps,
+        weight: record.weight,
+        volume: record.volume
+      });
+      return acc;
+    }, {});
+
+    const result = Object.entries(groupedByDate)
+      .slice(0, limit)
+      .map(([date, sets]) => ({
+        date,
+        sets
+      }));
+
+    return result;
   }
 
   async calculatePlates(targetWeight: number, barWeight = 20, availablePlates = [25, 20, 15, 10, 5, 2.5, 1.25]) {
