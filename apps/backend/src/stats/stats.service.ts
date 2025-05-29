@@ -271,7 +271,7 @@ export class StatsService {
 
   async getVolumeTrends(userId: number, period: 'week' | 'month', duration: number) {
     const now = new Date();
-    const data = [];
+    const data: { period: string; volume: number }[] = [];
 
     for (let i = duration - 1; i >= 0; i--) {
       let from: Date, to: Date;

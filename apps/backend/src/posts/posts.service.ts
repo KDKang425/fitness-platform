@@ -121,7 +121,7 @@ export class PostsService {
     const popularPosts = await this.getPopularPosts(Math.ceil(limit * 0.2), userId);
 
     const seenIds = new Set<number>();
-    const combinedPosts = [];
+    const combinedPosts: Post[] = [];
 
     for (const post of [...followingPosts, ...similarUserPosts, ...popularPosts]) {
       if (!seenIds.has(post.id)) {

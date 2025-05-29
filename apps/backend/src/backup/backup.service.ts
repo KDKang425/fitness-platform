@@ -65,7 +65,7 @@ export class BackupService {
       throw new Error('사용자를 찾을 수 없습니다.');
     }
 
-    const backupData = {
+    const backupData: BackupData = {
       version: '2.0',
       exportDate: new Date().toISOString(),
       user: {
@@ -166,8 +166,8 @@ export class BackupService {
         sessions: 0,
         bodyRecords: 0,
         personalRecords: 0,
-        skippedSessions: [],
-        errors: [],
+        skippedSessions: [] as { date: any; reason: string }[],
+        errors: [] as string[],
       };
 
       try {

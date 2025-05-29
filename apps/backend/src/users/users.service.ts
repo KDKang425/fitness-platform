@@ -107,8 +107,8 @@ export class UsersService {
 
     await this.userRepo.update(user.id, {
       emailVerified: true,
-      emailVerificationToken: null,
-      emailVerificationExpiry: null,
+      emailVerificationToken: undefined,
+      emailVerificationExpiry: undefined,
     });
 
     await this.cacheManager.del(cacheKey);
@@ -165,8 +165,8 @@ export class UsersService {
 
     await this.userRepo.update(userId, {
       password: hashedPassword,
-      passwordResetToken: null,
-      passwordResetExpiry: null,
+      passwordResetToken: undefined,
+      passwordResetExpiry: undefined,
     });
 
     // 비밀번호 변경 시 모든 리프레시 토큰 무효화를 위한 캐시 클리어
