@@ -68,44 +68,44 @@ export class StatsService {
   }
 
   private async computeStats(
-  userId: number,
-  curFrom: Date,
-  curTo: Date,
-  prevFrom: Date,
-  prevTo: Date,
-): Promise<StatsResponse> {
-  const [curData, curSessions] = await Promise.all([
-    this.queryMuscleVolume(userId, curFrom, curTo),
-    this.sessionRepo.count({
-      where: {
-        user: { id: userId },
-        startTime: Between(curFrom, curTo),
-      },
-    }),
-  ]);
+    userId: number,
+    curFrom: Date,
+    curTo: Date,
+    prevFrom: Date,
+    prevTo: Date,
+  ): Promise<StatsResponse> {
+    const [curData, curSessions] = await Promise.all([
+      this.queryMuscleVolume(userId, curFrom, curTo),
+      this.sessionRepo.count({
+        where: {
+          user: { id: userId },
+          startTime: Between(curFrom, curTo),
+        },
+      }),
+    ]);
 
-  const curTotal = curData.reduce((s, d) => s + d.volume, 0);
+    const curTotal = curData.reduce((s, d) => s + d.volume, 0);
 
-  const prevData = await this.queryMuscleVolume(userId, prevFrom, prevTo);
-  const prevTotal = prevData.reduce((s, d) => s + d.volume, 0);
+    const prevData = await this.queryMuscleVolume(userId, prevFrom, prevTo);
+    const prevTotal = prevData.reduce((s, d) => s + d.volume, 0);
 
-  const diff = prevTotal === 0 ? 100 : ((curTotal - prevTotal) / prevTotal) * 100;
+    const diff = prevTotal === 0 ? 100 : ((curTotal - prevTotal) / prevTotal) * 100;
 
-  const perMuscleGroup = curData.map(item => ({
-    muscle_group: item.muscle_group,
-    volume: item.volume,
-    percentage: curTotal > 0 ? Math.round((item.volume / curTotal) * 100) : 0,
-  }));
+    const perMuscleGroup = curData.map(item => ({
+      muscle_group: item.muscle_group,
+      volume: item.volume,
+      percentage: curTotal > 0 ? Math.round((item.volume / curTotal) * 100) : 0,
+    }));
 
-  return {
-    totalVolume: curTotal,
-    perMuscleGroup,
-    prevTotalVolume: prevTotal,
-    diffPercent: Math.round(diff * 10) / 10,
-    sessionCount: curSessions,
-    avgVolumePerSession: curSessions > 0 ? Math.round(curTotal / curSessions) : 0,
-  };
-}
+    return {
+      totalVolume: curTotal,
+      perMuscleGroup,
+      prevTotalVolume: prevTotal,
+      diffPercent: Math.round(diff * 10) / 10,
+      sessionCount: curSessions,
+      avgVolumePerSession: curSessions > 0 ? Math.round(curTotal / curSessions) : 0,
+    };
+  }
 
   private async queryMuscleVolume(userId: number, from: Date, to: Date) {
     const result = await this.sessionRepo
@@ -208,42 +208,35 @@ export class StatsService {
   }
 
   async getMuscleHeatmap(userId: number): Promise<MuscleHeatmapData[]> {
-  const thirtyDaysAgo = this.addDays(new Date(), -30);
+    const thirtyDaysAgo = this.addDays(new Date(), -30);
 
-  const data = await this.sessionRepo
-    .createQueryBuilder('s')
-    .leftJoin('s.workoutSets', 'set')
-    .leftJoin('set.exercise', 'ex')
-    .select('DATE(s.startTime)', 'date')
-    .addSelect('ex.category', 'muscle')
-    .addSelect('SUM(set.volume)', 'volume')
-    .where('s.user.id = :uid', { uid: userId })
-    .andWhere('s.startTime >= :from', { from: thirtyDaysAgo })
-    .groupBy('DATE(s.startTime)')
-    .addGroupBy('ex.category')
-    .getRawMany();
+    const data = await this.sessionRepo
+      .createQueryBuilder('s')
+      .leftJoin('s.workoutSets', 'set')
+      .leftJoin('set.exercise', 'ex')
+      .select('DATE(s.startTime)', 'date')
+      .addSelect('ex.category', 'muscle')
+      .addSelect('SUM(set.volume)', 'volume')
+      .where('s.user.id = :uid', { uid: userId })
+      .andWhere('s.startTime >= :from', { from: thirtyDaysAgo })
+      .groupBy('DATE(s.startTime)')
+      .addGroupBy('ex.category')
+      .getRawMany();
 
-  const muscleGroups = Object.values(MuscleGroup);
-  const heatmapData: MuscleHeatmapData[] = [];
-
-  for (const muscle of muscleGroups) {
-    const muscleData = data
-      .filter(d => d.muscle === muscle)
-      .map(d => ({
+    const groupedData = data.reduce((acc, d) => {
+      if (!acc[d.muscle]) acc[d.muscle] = [];
+      acc[d.muscle].push({
         date: d.date,
         volume: Number(d.volume) || 0,
-      }));
-
-    if (muscleData.length > 0) {
-      heatmapData.push({
-        muscle,
-        data: muscleData,
       });
-    }
-  }
+      return acc;
+    }, {} as Record<string, { date: string; volume: number }[]>);
 
-  return heatmapData;
-}
+    return Object.entries(groupedData).map(([muscle, data]) => ({
+      muscle,
+      data: data as { date: string; volume: number }[],
+    }));
+  }
 
   async getDashboardStats(userId: number) {
     const [prs, recentSessions, monthlyVolume] = await Promise.all([

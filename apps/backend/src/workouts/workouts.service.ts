@@ -37,43 +37,97 @@ export class WorkoutsService {
   ) {}
 
   async startSession(dto: CreateWorkoutSessionDto) {
-    const user = await this.userRepo.findOneBy({ id: dto.userId });
-    if (!user) throw new NotFoundException('User not found');
+    return this.dataSource.transaction(async (manager) => {
+      const user = await manager.findOne(User, { where: { id: dto.userId } });
+      if (!user) throw new NotFoundException('User not found');
 
-    const activeSession = await this.sessionRepo.findOne({
-      where: {
-        user: { id: dto.userId },
-        endTime: IsNull(),
-      },
-    });
-
-    if (activeSession) {
-      throw new BadRequestException('이미 진행 중인 운동 세션이 있습니다.');
-    }
-
-    if (dto.routineId) {
-      const routine = await this.routineRepo.findOne({
-        where: { id: dto.routineId },
-        relations: ['creator'],
+      const activeSession = await manager.findOne(WorkoutSession, {
+        where: {
+          user: { id: dto.userId },
+          endTime: IsNull(),
+        },
       });
 
-      if (!routine) {
-        throw new NotFoundException('Routine not found');
+      if (activeSession) {
+        throw new BadRequestException('이미 진행 중인 운동 세션이 있습니다.');
       }
 
-      if (!routine.isPublic && routine.creator?.id !== dto.userId) {
-        throw new BadRequestException('이 루틴에 접근할 권한이 없습니다.');
-      }
-    }
+      if (dto.routineId) {
+        const routine = await manager.findOne(Routine, {
+          where: { id: dto.routineId },
+          relations: ['creator'],
+        });
 
-    const session = this.sessionRepo.create({
-      user,
-      routine: dto.routineId ? ({ id: dto.routineId } as any) : null,
-      startTime: dto.startTime ?? new Date(),
-      totalVolume: 0,
+        if (!routine) {
+          throw new NotFoundException('Routine not found');
+        }
+
+        if (!routine.isPublic && routine.creator?.id !== dto.userId) {
+          throw new BadRequestException('이 루틴에 접근할 권한이 없습니다.');
+        }
+      }
+
+      const session = manager.create(WorkoutSession, {
+        user,
+        routine: dto.routineId ? ({ id: dto.routineId } as any) : null,
+        startTime: dto.startTime ?? new Date(),
+        totalVolume: 0,
+        pausedIntervals: [],
+        totalPausedTime: 0,
+      });
+      
+      return manager.save(session);
     });
-    
-    return this.sessionRepo.save(session);
+  }
+
+  async pauseSession(sessionId: number) {
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager.findOne(WorkoutSession, { 
+        where: { id: sessionId } 
+      });
+      
+      if (!session || session.endTime) {
+        throw new BadRequestException('Invalid session');
+      }
+      
+      if (!session.pausedIntervals) session.pausedIntervals = [];
+      
+      const lastPause = session.pausedIntervals[session.pausedIntervals.length - 1];
+      if (lastPause && !lastPause.resumedAt) {
+        throw new BadRequestException('Session is already paused');
+      }
+      
+      session.pausedIntervals.push({ pausedAt: new Date(), resumedAt: undefined });
+      
+      return manager.save(session);
+    });
+  }
+
+  async resumeSession(sessionId: number) {
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager.findOne(WorkoutSession, { 
+        where: { id: sessionId } 
+      });
+      
+      if (!session || session.endTime) {
+        throw new BadRequestException('Invalid session');
+      }
+      
+      if (!session.pausedIntervals || session.pausedIntervals.length === 0) {
+        throw new BadRequestException('Session is not paused');
+      }
+      
+      const lastPause = session.pausedIntervals[session.pausedIntervals.length - 1];
+      if (lastPause.resumedAt) {
+        throw new BadRequestException('Session is not paused');
+      }
+      
+      lastPause.resumedAt = new Date();
+      const pauseDuration = lastPause.resumedAt.getTime() - lastPause.pausedAt.getTime();
+      session.totalPausedTime += Math.floor(pauseDuration / 1000);
+      
+      return manager.save(session);
+    });
   }
 
   async addSet(dto: CreateWorkoutSetDto) {
@@ -125,36 +179,39 @@ export class WorkoutsService {
   }
 
   async finishSession(id: number, endTime?: string) {
-    const session = await this.sessionRepo.findOne({
-      where: { id },
-      relations: ['workoutSets'],
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager.findOne(WorkoutSession, {
+        where: { id },
+        relations: ['workoutSets'],
+      });
+      
+      if (!session) throw new NotFoundException('Session not found');
+      if (session.endTime) {
+        throw new BadRequestException('세션이 이미 종료되었습니다.');
+      }
+      if (!session.startTime) {
+        throw new BadRequestException('세션 시작 시간이 없습니다.');
+      }
+      if (session.workoutSets?.length === 0) {
+        throw new BadRequestException('운동 기록이 없는 세션은 종료할 수 없습니다.');
+      }
+
+      const finishedAt = endTime ? new Date(endTime) : new Date();
+      
+      if (finishedAt <= session.startTime) {
+        throw new BadRequestException('종료 시간은 시작 시간 이후여야 합니다.');
+      }
+
+      const totalDurationSec = Math.floor(
+        (finishedAt.getTime() - session.startTime.getTime()) / 1000
+      );
+      const actualDurationSec = totalDurationSec - (session.totalPausedTime || 0);
+
+      session.endTime = finishedAt;
+      session.totalTime = actualDurationSec;
+
+      return manager.save(session);
     });
-    
-    if (!session) throw new NotFoundException('Session not found');
-    if (session.endTime) {
-      throw new BadRequestException('세션이 이미 종료되었습니다.');
-    }
-    if (!session.startTime) {
-      throw new BadRequestException('세션 시작 시간이 없습니다.');
-    }
-    if (session.workoutSets?.length === 0) {
-      throw new BadRequestException('운동 기록이 없는 세션은 종료할 수 없습니다.');
-    }
-
-    const finishedAt = endTime ? new Date(endTime) : new Date();
-    
-    if (finishedAt <= session.startTime) {
-      throw new BadRequestException('종료 시간은 시작 시간 이후여야 합니다.');
-    }
-
-    const durationSec = Math.floor(
-      (finishedAt.getTime() - session.startTime.getTime()) / 1000
-    );
-
-    session.endTime = finishedAt;
-    session.totalTime = durationSec;
-
-    return this.sessionRepo.save(session);
   }
 
   async findSession(id: number) {
@@ -284,36 +341,38 @@ export class WorkoutsService {
   }
 
   async addManualWorkout(userId: number, dto: any) {
-    const session = await this.sessionRepo.save({
-      user: { id: userId } as any,
-      date: dto.date || new Date().toISOString().split('T')[0],
-      startTime: new Date(dto.date + ' ' + dto.startTime),
-      endTime: new Date(dto.date + ' ' + dto.endTime),
-      totalTime: dto.duration || 0,
-      totalVolume: 0,
-    });
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager.save(WorkoutSession, {
+        user: { id: userId } as any,
+        date: dto.date || new Date().toISOString().split('T')[0],
+        startTime: new Date(dto.date + ' ' + dto.startTime),
+        endTime: new Date(dto.date + ' ' + dto.endTime),
+        totalTime: dto.duration || 0,
+        totalVolume: 0,
+      });
 
-    let totalVolume = 0;
-    for (const exercise of dto.exercises) {
-      for (const set of exercise.sets) {
-        const volume = calcVolume(set.reps, set.weight);
-        totalVolume += volume;
-        
-        await this.setRepo.save({
-          workoutSession: session,
-          exercise: { id: exercise.exerciseId } as any,
-          setNumber: set.setNumber,
-          reps: set.reps,
-          weight: set.weight,
-          volume,
-        });
+      let totalVolume = 0;
+      for (const exercise of dto.exercises) {
+        for (const set of exercise.sets) {
+          const volume = calcVolume(set.reps, set.weight);
+          totalVolume += volume;
+          
+          await manager.save(WorkoutSet, {
+            workoutSession: session,
+            exercise: { id: exercise.exerciseId } as any,
+            setNumber: set.setNumber,
+            reps: set.reps,
+            weight: set.weight,
+            volume,
+          });
 
-        await this.prSvc.updateRecord(userId, exercise.exerciseId, set.weight, set.reps);
+          await this.prSvc.updateRecord(userId, exercise.exerciseId, set.weight, set.reps);
+        }
       }
-    }
 
-    session.totalVolume = totalVolume;
-    return this.sessionRepo.save(session);
+      session.totalVolume = totalVolume;
+      return manager.save(session);
+    });
   }
 
   async deleteSet(userId: number, setId: number) {

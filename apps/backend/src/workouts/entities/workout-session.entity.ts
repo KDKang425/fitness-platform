@@ -35,6 +35,12 @@ export class WorkoutSession {
   @Column({ type: 'int', default: 0 })
   totalVolume: number;
 
+  @Column({ type: 'jsonb', nullable: true })
+  pausedIntervals?: { pausedAt: Date; resumedAt?: Date }[];
+
+  @Column({ type: 'int', default: 0 })
+  totalPausedTime: number;
+
   @ManyToOne(() => User, (user) => user.workoutSessions, {
     nullable: false,
     onDelete: 'NO ACTION',

@@ -13,6 +13,20 @@ import { QueryFailedError } from 'typeorm';
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
+  private readonly errorMessages = {
+    '23505': (err: any) => {
+      if (err.constraint === 'users_email_key') return '이미 사용중인 이메일입니다.';
+      if (err.constraint === 'users_nickname_key') return '이미 사용중인 닉네임입니다.';
+      if (err.constraint === 'routine_exercises_routine_id_exercise_id_key') return '루틴에 중복된 운동이 있습니다.';
+      if (err.constraint === 'likes_user_id_post_id_key') return '이미 좋아요한 게시물입니다.';
+      if (err.constraint === 'follows_follower_id_following_id_key') return '이미 팔로우한 사용자입니다.';
+      return '중복된 데이터가 존재합니다.';
+    },
+    '23503': () => '참조하는 데이터가 존재하지 않습니다.',
+    '23502': () => '필수 항목이 누락되었습니다.',
+    '22P02': () => '잘못된 데이터 형식입니다.',
+  };
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -38,41 +52,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     else if (exception instanceof QueryFailedError) {
       const err = exception as any;
       
-      switch (err.code) {
-        case '23505': 
-          status = HttpStatus.CONFLICT;
-          error = 'Conflict';
-          message = '중복된 데이터가 존재합니다.';
-          if (err.detail) {
-            const match = err.detail.match(/Key \((.+)\)=\((.+)\) already exists/);
-            if (match) {
-              message = `${match[1]}이(가) 이미 존재합니다: ${match[2]}`;
-            }
-          }
-          break;
-          
-        case '23503':
-          status = HttpStatus.BAD_REQUEST;
-          error = 'Bad Request';
-          message = '참조하는 데이터가 존재하지 않습니다.';
-          break;
-          
-        case '23502': 
-          status = HttpStatus.BAD_REQUEST;
-          error = 'Bad Request';
-          message = '필수 항목이 누락되었습니다.';
-          break;
-          
-        case '22P02': 
-          status = HttpStatus.BAD_REQUEST;
-          error = 'Bad Request';
-          message = '잘못된 데이터 형식입니다.';
-          break;
-          
-        default:
-          status = HttpStatus.INTERNAL_SERVER_ERROR;
-          error = 'Database Error';
-          message = '데이터베이스 오류가 발생했습니다.';
+      const errorHandler = this.errorMessages[err.code];
+      if (errorHandler) {
+        message = typeof errorHandler === 'function' ? errorHandler(err) : errorHandler;
+        status = err.code === '23505' ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST;
+        error = err.code === '23505' ? 'Conflict' : 'Bad Request';
+      } else {
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        error = 'Database Error';
+        message = '데이터베이스 오류가 발생했습니다.';
       }
       
       if (process.env.NODE_ENV === 'development') {
@@ -92,6 +80,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
           stack: exception.stack,
         };
       }
+    }
+
+    if (process.env.NODE_ENV === 'production' && details?.stack) {
+      delete details.stack;
     }
 
     this.logger.error(

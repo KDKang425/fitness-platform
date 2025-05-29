@@ -27,6 +27,12 @@ async function bootstrap() {
       windowMs: 15 * 60 * 1000,
       max: 100,
       message: 'Too many requests from this IP, please try again later.',
+      keyGenerator: (req: any) => {
+        return req.user?.userId || req.ip;
+      },
+      skip: (req: any) => {
+        return req.user?.role === 'admin';
+      }
     }),
   );
   
@@ -78,6 +84,9 @@ async function bootstrap() {
     .addTag('stats', '통계 관련 API')
     .addTag('posts', '피드 관련 API')
     .addTag('upload', '파일 업로드 API')
+    .addTag('admin', '관리자 API')
+    .addTag('notifications', '알림 API')
+    .addTag('export', '데이터 내보내기 API')
     .build();
 
   const swaggerDoc = SwaggerModule.createDocument(app, swaggerConfig);

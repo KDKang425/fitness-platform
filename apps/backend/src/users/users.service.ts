@@ -61,56 +61,61 @@ export class UsersService {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 24);
 
+    const hashedToken = await bcrypt.hash(token, 10);
+
     await this.userRepo.update(userId, {
-      emailVerificationToken: token,
+      emailVerificationToken: hashedToken,
       emailVerificationExpiry: expiry,
     });
   }
 
   async verifyEmailToken(token: string) {
-    const user = await this.userRepo.findOne({
+    const users = await this.userRepo.find({
       where: {
-        emailVerificationToken: token,
         emailVerificationExpiry: MoreThan(new Date()),
       },
     });
 
-    if (!user) {
-      return null;
+    for (const user of users) {
+      if (user.emailVerificationToken && await bcrypt.compare(token, user.emailVerificationToken)) {
+        await this.userRepo.update(user.id, {
+          emailVerified: true,
+          emailVerificationToken: undefined,
+          emailVerificationExpiry: undefined,
+        });
+        return user;
+      }
     }
 
-    await this.userRepo.update(user.id, {
-      emailVerified: true,
-      emailVerificationToken: undefined,
-      emailVerificationExpiry: undefined,
-    });
-
-    return user;
+    return null;
   }
 
   async savePasswordResetToken(userId: number, token: string) {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 1);
 
+    const hashedToken = await bcrypt.hash(token, 10);
+
     await this.userRepo.update(userId, {
-      passwordResetToken: token,
+      passwordResetToken: hashedToken,
       passwordResetExpiry: expiry,
     });
   }
 
   async verifyPasswordResetToken(token: string) {
-    const user = await this.userRepo.findOne({
+    const users = await this.userRepo.find({
       where: {
-        passwordResetToken: token,
         passwordResetExpiry: MoreThan(new Date()),
       },
     });
 
-    if (!user) {
-      return null;
+    for (const user of users) {
+      if (user.passwordResetToken && await bcrypt.compare(token, user.passwordResetToken)) {
+        return user;
+      }
     }
 
-    return user;
+    return null;
   }
 
   async updatePassword(userId: number, newPassword: string) {

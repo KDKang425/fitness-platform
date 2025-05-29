@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsNumber, IsString, IsOptional, validateSync } from 'class-validator';
+import { IsNumber, IsString, IsOptional, validateSync, IsNotEmpty, Min, Max } from 'class-validator';
 
 export class EnvironmentVariables {
   @IsNumber()
@@ -42,6 +42,53 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   UPLOAD_DIR?: string;
+
+  @IsOptional()
+  @IsString()
+  SENDGRID_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  FIREBASE_PROJECT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  FIREBASE_CLIENT_EMAIL?: string;
+
+  @IsOptional()
+  @IsString()
+  FIREBASE_PRIVATE_KEY?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(86400)
+  CACHE_EXERCISE_TTL?: number = 3600;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  FRONTEND_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  EMAIL_FROM?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_HOST?: string;
+
+  @IsOptional()
+  @IsNumber()
+  SMTP_PORT?: number;
+
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASS?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

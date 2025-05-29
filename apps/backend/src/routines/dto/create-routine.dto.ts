@@ -55,19 +55,32 @@ class ExerciseItemDto {
 }
 
 export class CreateRoutineDto {
-  @ApiProperty({ description: '루틴 이름', example: '월요일 상체 루틴' })
+  @ApiProperty({ 
+    description: '루틴 이름', 
+    example: '월요일 상체 루틴',
+    minLength: 1,
+    maxLength: 100 
+  })
   @IsString()
   @IsNotEmpty({ message: '루틴 이름은 필수입니다.' })
   @MaxLength(100, { message: '루틴 이름은 100자 이하여야 합니다.' })
   name: string;
 
-  @ApiPropertyOptional({ description: '루틴 설명', example: '초보자를 위한 상체 루틴' })
+  @ApiPropertyOptional({ 
+    description: '루틴 설명', 
+    example: '초보자를 위한 상체 루틴',
+    maxLength: 255
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255, { message: '설명은 255자 이하여야 합니다.' })
   description?: string;
 
-  @ApiPropertyOptional({ description: '공개 여부', default: true })
+  @ApiPropertyOptional({ 
+    description: '공개 여부', 
+    default: true,
+    example: true
+  })
   @IsOptional()
   @IsBoolean()
   @Expose({ name: 'is_public' })
@@ -77,7 +90,14 @@ export class CreateRoutineDto {
     description: '운동 목록', 
     type: [ExerciseItemDto],
     minItems: 1,
-    maxItems: 30
+    maxItems: 30,
+    example: [{
+      exerciseId: 1,
+      exerciseOrder: 1,
+      defaultSets: 3,
+      defaultReps: 8,
+      defaultWeight: 60
+    }]
   })
   @IsArray()
   @ArrayMinSize(1, { message: '최소 1개의 운동이 필요합니다.' })

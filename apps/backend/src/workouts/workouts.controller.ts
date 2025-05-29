@@ -40,6 +40,22 @@ export class WorkoutsController {
     });
   }
 
+  @ApiOperation({ summary: '운동 세션 일시정지' })
+  @ApiResponse({ status: 200, description: '세션이 성공적으로 일시정지됨' })
+  @ApiResponse({ status: 400, description: '유효하지 않은 세션' })
+  @Patch(':id/pause')
+  pauseSession(@Param('id', ParseIntPipe) id: number) {
+    return this.workoutsService.pauseSession(id);
+  }
+
+  @ApiOperation({ summary: '운동 세션 재개' })
+  @ApiResponse({ status: 200, description: '세션이 성공적으로 재개됨' })
+  @ApiResponse({ status: 400, description: '유효하지 않은 세션' })
+  @Patch(':id/resume')
+  resumeSession(@Param('id', ParseIntPipe) id: number) {
+    return this.workoutsService.resumeSession(id);
+  }
+
   @ApiOperation({ summary: '운동 세트 추가' })
   @ApiResponse({ status: 201, description: '세트가 성공적으로 추가됨' })
   @ApiResponse({ status: 404, description: '세션 또는 운동을 찾을 수 없음' })
