@@ -1,15 +1,27 @@
-import React from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import React, { useEffect } from 'react'
+import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native'
+import api from '../utils/api'
 
-export default function ProgramStartScreen() {
+export default function ProgramStartScreen({ navigation }: any) {
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const { data } = await api.post('/workouts', { type: 'program' })
+        navigation.replace('WorkoutSession', { sessionId: data.id })
+      } catch (e) {
+        Alert.alert('오류', '세션 생성에 실패했습니다.')
+        navigation.goBack()
+      }
+    })()
+  }, [])
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>프로그램 시작 화면 (TODO)</Text>
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color="orange" />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-  text: { color: '#fff', fontSize: 18 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
 })
