@@ -8,7 +8,7 @@ function getBaseUrl() {
   console.log('Debug Host:', host)
   
   if (host) {
-    const url = `http://${host}:3001/api/v1`
+    const url = `http://192.168.0.12:3001/api/v1`
     console.log('Development API URL:', url)
     return url
   }
