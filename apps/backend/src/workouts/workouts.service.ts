@@ -18,6 +18,7 @@ import { CreateWorkoutSetDto } from './dto/create-workout-set.dto';
 
 import { calcVolume } from '../common/utils/volume.util';
 import { PersonalRecordsService } from '../personal-records/personal-records.service';
+import { StatsBatchService } from '../stats/stats-batch.service';
 
 @Injectable()
 export class WorkoutsService {
@@ -34,6 +35,7 @@ export class WorkoutsService {
     private readonly routineRepo: Repository<Routine>,
     private readonly dataSource: DataSource,
     private readonly prSvc: PersonalRecordsService,
+    private readonly statsBatchService: StatsBatchService,
   ) {}
 
   async startSession(dto: CreateWorkoutSessionDto) {
@@ -67,9 +69,14 @@ export class WorkoutsService {
         }
       }
 
+      const kstDate = new Date();
+      kstDate.setHours(kstDate.getHours() + 9);
+      const dateStr = kstDate.toISOString().split('T')[0];
+
       const session = manager.create(WorkoutSession, {
         user,
         routine: dto.routineId ? ({ id: dto.routineId } as any) : null,
+        date: dateStr,
         startTime: dto.startTime ?? new Date(),
         totalVolume: 0,
         pausedIntervals: [],
@@ -187,7 +194,7 @@ export class WorkoutsService {
     return this.dataSource.transaction(async (manager) => {
       const session = await manager.findOne(WorkoutSession, {
         where: { id },
-        relations: ['workoutSets'],
+        relations: ['workoutSets', 'user'],
       });
       
       if (!session) throw new NotFoundException('세션을 찾을 수 없습니다.');
@@ -215,7 +222,11 @@ export class WorkoutsService {
       session.endTime = finishedAt;
       session.totalTime = actualDurationSec;
 
-      return manager.save(session);
+      const saved = await manager.save(session);
+
+      await this.statsBatchService.updateRealtimeStats(session.user.id, id);
+
+      return saved;
     });
   }
 
@@ -376,7 +387,11 @@ export class WorkoutsService {
       }
 
       session.totalVolume = totalVolume;
-      return manager.save(session);
+      const saved = await manager.save(session);
+
+      await this.statsBatchService.updateRealtimeStats(userId, session.id);
+
+      return saved;
     });
   }
 
@@ -384,7 +399,7 @@ export class WorkoutsService {
     return this.dataSource.transaction(async (manager) => {
       const set = await manager.findOne(WorkoutSet, {
         where: { id: setId },
-        relations: ['workoutSession', 'workoutSession.user'],
+        relations: ['workoutSession', 'workoutSession.user', 'exercise'],
       });
 
       if (!set) throw new NotFoundException('세트를 찾을 수 없습니다.');
@@ -395,11 +410,23 @@ export class WorkoutsService {
         throw new BadRequestException('종료된 세션의 세트는 삭제할 수 없습니다.');
       }
 
+      const deletedSetNumber = set.setNumber;
+      const exerciseId = set.exercise.id;
+      const sessionId = set.workoutSession.id;
+
       await manager.delete(WorkoutSet, { id: setId });
+      
+      await manager.query(`
+        UPDATE workout_sets 
+        SET set_number = set_number - 1 
+        WHERE workout_session_id = $1 
+          AND exercise_id = $2 
+          AND set_number > $3
+      `, [sessionId, exerciseId, deletedSetNumber]);
       
       await manager.decrement(
         WorkoutSession,
-        { id: set.workoutSession.id },
+        { id: sessionId },
         'totalVolume',
         set.volume
       );

@@ -4,11 +4,17 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
 import { Follow } from './entities/follow.entity';
+import { FriendRequest } from './entities/friend-request.entity';
+import { FriendRequestService } from './friend-request.service';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Follow])],
+  imports: [
+    TypeOrmModule.forFeature([User, Follow, FriendRequest]),
+    NotificationModule,
+  ],
   controllers: [UsersController],
-  providers: [UsersService],
-  exports: [UsersService],
+  providers: [UsersService, FriendRequestService],
+  exports: [UsersService, FriendRequestService],
 })
 export class UsersModule {}

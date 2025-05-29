@@ -46,6 +46,7 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   SENDGRID_API_KEY?: string;
 
   @IsOptional()
@@ -100,6 +101,30 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   @IsIn(['development', 'production', 'test'])
   NODE_ENV: string;
+
+  @IsOptional()
+  @IsString()
+  AWS_REGION?: string;
+
+  @IsOptional()
+  @IsString()
+  AWS_ACCESS_KEY_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  AWS_SECRET_ACCESS_KEY?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  MAX_FILE_SIZE_MB?: number = 5;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  USER_STORAGE_LIMIT_MB?: number = 100;
 }
 
 export function validate(config: Record<string, unknown>) {

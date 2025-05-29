@@ -11,6 +11,8 @@ import { BodyRecord } from 'src/body-records/entities/body-record.entity';
 import { RoutineSubscription } from '../../routine-subscriptions/entities/routine-subscription.entity';
 import { PersonalRecord } from '../../personal-records/entities/personal-record.entity';
 import { Notification } from '../../notification/entities/notification.entity';
+import { UserProgram } from '../../programs/entities/user-program.entity';
+import { FriendRequest } from './friend-request.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -18,7 +20,7 @@ export enum UserRole {
 }
 
 @Entity('users')
-@Unique('users_email_key', ['email'])         
+@Unique('users_email_key', ['email'])
 @Unique('users_nickname_key', ['nickname'])
 export class User {
   @PrimaryGeneratedColumn()
@@ -50,6 +52,9 @@ export class User {
 
   @Column({ nullable: true })
   deadlift1RM?: number;
+
+  @Column({ nullable: true })
+  overheadPress1RM?: number;
 
   @Column({ default: false })
   hasCompletedInitialSetup: boolean;
@@ -117,4 +122,13 @@ export class User {
 
   @OneToMany(() => Notification, (notification) => notification.user)
   notifications: Notification[];
+
+  @OneToMany(() => UserProgram, (program) => program.user)
+  userPrograms: UserProgram[];
+
+  @OneToMany(() => FriendRequest, (request) => request.requester)
+  sentFriendRequests: FriendRequest[];
+
+  @OneToMany(() => FriendRequest, (request) => request.recipient)
+  receivedFriendRequests: FriendRequest[];
 }

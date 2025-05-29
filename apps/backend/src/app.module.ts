@@ -25,6 +25,8 @@ import { EmailModule } from './email/email.module';
 import { NotificationModule } from './notification/notification.module';
 import { ExportModule } from './export/export.module';
 import { AdminModule } from './admin/admin.module';
+import { WorkoutTemplatesModule } from './workout-templates/workout-templates.module';
+import { UserProgramsModule } from './programs/user-programs.module';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
@@ -52,8 +54,8 @@ import { validate } from './config/env.validation';
         logging: process.env.NODE_ENV === 'development',
         namingStrategy: new SnakeNamingStrategy(),
         extra: {
-          max: 10, 
-          idleTimeoutMillis: 30000, 
+          max: 10,
+          idleTimeoutMillis: 30000,
         },
       }),
       inject: [ConfigService],
@@ -123,6 +125,8 @@ import { validate } from './config/env.validation';
     NotificationModule,
     ExportModule,
     AdminModule,
+    WorkoutTemplatesModule,
+    UserProgramsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
