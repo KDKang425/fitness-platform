@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react'
+import React, { useEffect, useState } from 'react'
 import { View, Image, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import api from '../utils/api'
@@ -6,7 +6,7 @@ import api from '../utils/api'
 export default function PostDetailScreen({ route }: { route: any }) {
   const { id } = route.params
   const [loading, setLoading] = useState(true)
-  const [post, setPost] = useState<any>(null)
+  const [post, setPost] = useState<{ imageUrl: string; caption: string } | null>(null)
   const [liked, setLiked] = useState(false)
   const [likes, setLikes] = useState(0)
 
@@ -14,9 +14,10 @@ export default function PostDetailScreen({ route }: { route: any }) {
     setLoading(true)
     try {
       const res = await api.get(`/posts/${id}`)
-      setPost(res.data)
-      setLiked(res.data.liked)
-      setLikes(res.data.likes)
+      const p = res.data
+      setPost({ imageUrl: p.imageUrl, caption: p.content })
+      setLiked(p.liked ?? p.isLiked ?? false)
+      setLikes(p.likesCount ?? 0)
     } catch {
       setPost({ imageUrl: `https://picsum.photos/id/${id}/600/600`, caption: '더미 게시글' })
       setLikes(23)
@@ -30,13 +31,17 @@ export default function PostDetailScreen({ route }: { route: any }) {
 
   const onLike = async () => {
     try {
-      await api.post(`/posts/${id}/like`)
+      if (liked) {
+        await api.delete(`/posts/${id}/likes`)
+      } else {
+        await api.post(`/posts/${id}/likes`)
+      }
+      setLiked(!liked)
+      setLikes((prev) => prev + (liked ? -1 : 1))
     } catch {}
-    setLiked(!liked)
-    setLikes(likes + (liked ? -1 : 1))
   }
 
-  if (loading) {
+  if (loading || !post) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#ff7f27" />

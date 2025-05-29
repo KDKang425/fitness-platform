@@ -1,30 +1,26 @@
-import React, { useState, useContext } from 'react'
+import React, { useState } from 'react'
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native'
 import api from '../utils/api'
-import { AuthContext } from '../contexts/AuthContext'
 
-export default function ProfileSetupScreen({ route }: { route: any }) {
-  const { email, password } = route.params
+export default function ProfileSetupScreen({ navigation }: { navigation: any }) {
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
   const [bench, setBench] = useState('')
   const [squat, setSquat] = useState('')
   const [deadlift, setDeadlift] = useState('')
-  const { login } = useContext(AuthContext)
 
   const onSubmit = async () => {
     try {
-      await api.put('/users/profile', {
+      await api.post('/users/profile/initial', {
         height: Number(height),
-        weight: Number(weight),
+        initial_weight: Number(weight),
         bench_press_1rm: Number(bench),
         squat_1rm: Number(squat),
         deadlift_1rm: Number(deadlift),
       })
-      const res = await api.post('/auth/login', { email, password })
-      const { accessToken, refreshToken } = res.data
-      await login(accessToken, refreshToken)
-    } catch {}
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] })
+    } catch {
+    }
   }
 
   return (

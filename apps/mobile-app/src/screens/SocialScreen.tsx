@@ -4,7 +4,7 @@ import api from '../utils/api'
 
 const size = Dimensions.get('window').width / 3 - 2
 
-type Post = { id: string; imageUrl: string }
+type Post = { id: number; imageUrl: string }
 
 export default function SocialScreen({ navigation }: { navigation: any }) {
   const [loading, setLoading] = useState(true)
@@ -13,12 +13,16 @@ export default function SocialScreen({ navigation }: { navigation: any }) {
   const fetchPosts = async () => {
     setLoading(true)
     try {
-      const res = await api.get('/posts?feed=all')
-      setPosts(res.data)
+      const res = await api.get('/posts?sort=recent')
+      const list = (res.data.posts ?? []).map((p: any) => ({
+        id: p.id,
+        imageUrl: p.imageUrl,
+      }))
+      setPosts(list)
     } catch {
       setPosts(
         Array.from({ length: 15 }).map((_, i) => ({
-          id: String(i + 1),
+          id: i + 1,
           imageUrl: `https://picsum.photos/seed/${i + 1}/300/300`,
         })),
       )
@@ -44,7 +48,7 @@ export default function SocialScreen({ navigation }: { navigation: any }) {
     </TouchableOpacity>
   )
 
-  return <FlatList data={posts} keyExtractor={p => p.id} renderItem={renderItem} numColumns={3} />
+  return <FlatList data={posts} keyExtractor={(p) => String(p.id)} renderItem={renderItem} numColumns={3} />
 }
 
 const styles = StyleSheet.create({

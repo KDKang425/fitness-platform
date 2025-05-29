@@ -7,7 +7,7 @@ import ProfileSetupScreen from '../screens/ProfileSetupScreen'
 export type AuthStackParamList = {
   Login: undefined
   Signup: undefined
-  ProfileSetup: { email: string; password: string }
+  ProfileSetup: undefined
 }
 
 const Stack = createNativeStackNavigator<AuthStackParamList>()

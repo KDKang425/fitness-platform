@@ -1,17 +1,25 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native'
 import api from '../utils/api'
+import { AuthContext } from '../contexts/AuthContext'
 
 export default function SignupScreen({ navigation }: { navigation: any }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
+  const { login } = useContext(AuthContext)
 
   const onPressSignup = async () => {
     try {
-      await api.post('/auth/signup', { email, password, nickname })
-      navigation.navigate('ProfileSetup', { email, password })
-    } catch {}
+      await api.post('/auth/register', { email, password, nickname })
+
+      const res = await api.post('/auth/login', { email, password })
+      const { accessToken, refreshToken } = res.data
+      await login(accessToken, refreshToken)
+
+      navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] })
+    } catch (e) {
+    }
   }
 
   return (
