@@ -12,6 +12,9 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InitialProfileDto } from './dto/initial-profile.dto';
 import * as bcrypt from 'bcryptjs';
+import { Cache } from 'cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
 
 @Injectable()
 export class UsersService {
@@ -20,6 +23,7 @@ export class UsersService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(Follow)
     private readonly followRepo: Repository<Follow>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async createUser(dto: CreateUserDto): Promise<User> {
@@ -61,61 +65,63 @@ export class UsersService {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 24);
 
-    const hashedToken = await bcrypt.hash(token, 10);
+    const cacheKey = `email-verify:${token}`;
+    await this.cacheManager.set(cacheKey, userId, 86400000);
 
     await this.userRepo.update(userId, {
-      emailVerificationToken: hashedToken,
       emailVerificationExpiry: expiry,
     });
   }
 
   async verifyEmailToken(token: string) {
-    const users = await this.userRepo.find({
-      where: {
-        emailVerificationExpiry: MoreThan(new Date()),
-      },
-    });
+    const cacheKey = `email-verify:${token}`;
+    const userId = await this.cacheManager.get<number>(cacheKey);
 
-    for (const user of users) {
-      if (user.emailVerificationToken && await bcrypt.compare(token, user.emailVerificationToken)) {
-        await this.userRepo.update(user.id, {
-          emailVerified: true,
-          emailVerificationToken: undefined,
-          emailVerificationExpiry: undefined,
-        });
-        return user;
-      }
+    if (!userId) {
+      return null;
     }
 
-    return null;
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user || !user.emailVerificationExpiry || user.emailVerificationExpiry < new Date()) {
+      return null;
+    }
+
+    await this.userRepo.update(user.id, {
+      emailVerified: true,
+      emailVerificationToken: undefined,
+      emailVerificationExpiry: undefined,
+    });
+
+    await this.cacheManager.del(cacheKey);
+    return user;
   }
 
   async savePasswordResetToken(userId: number, token: string) {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 1);
 
-    const hashedToken = await bcrypt.hash(token, 10);
+    const cacheKey = `pwd-reset:${token}`;
+    await this.cacheManager.set(cacheKey, userId, 3600000);
 
     await this.userRepo.update(userId, {
-      passwordResetToken: hashedToken,
       passwordResetExpiry: expiry,
     });
   }
 
   async verifyPasswordResetToken(token: string) {
-    const users = await this.userRepo.find({
-      where: {
-        passwordResetExpiry: MoreThan(new Date()),
-      },
-    });
+    const cacheKey = `pwd-reset:${token}`;
+    const userId = await this.cacheManager.get<number>(cacheKey);
 
-    for (const user of users) {
-      if (user.passwordResetToken && await bcrypt.compare(token, user.passwordResetToken)) {
-        return user;
-      }
+    if (!userId) {
+      return null;
     }
 
-    return null;
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user || !user.passwordResetExpiry || user.passwordResetExpiry < new Date()) {
+      return null;
+    }
+
+    return user;
   }
 
   async updatePassword(userId: number, newPassword: string) {
@@ -148,7 +154,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundException(`ID ${id}인 사용자를 찾을 수 없습니다.`);
     }
 
     return user;
@@ -161,7 +167,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
     const [followerCount, followingCount] = await Promise.all([
@@ -179,7 +185,7 @@ export class UsersService {
   async setInitialProfile(userId: number, dto: InitialProfileDto) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
     user.height = dto.height;
@@ -197,7 +203,7 @@ export class UsersService {
   async updateProfile(userId: number, dto: UpdateUserDto) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
     if (dto.nickname && dto.nickname !== user.nickname) {
@@ -248,10 +254,10 @@ export class UsersService {
   async remove(id: number) {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) {
-      throw new NotFoundException(`User with ID=${id} not found`);
+      throw new NotFoundException(`ID ${id}인 사용자를 찾을 수 없습니다.`);
     }
     await this.userRepo.remove(user);
-    return { success: true, message: 'User deleted successfully' };
+    return { success: true, message: '사용자가 성공적으로 삭제되었습니다.' };
   }
 
   async followUser(followerId: number, followingId: number) {
@@ -280,7 +286,7 @@ export class UsersService {
     });
     
     await this.followRepo.save(follow);
-    return { success: true, message: 'Successfully followed user' };
+    return { success: true, message: '팔로우했습니다.' };
   }
 
   async unfollowUser(followerId: number, followingId: number) {
@@ -293,7 +299,7 @@ export class UsersService {
       throw new NotFoundException('팔로우 관계를 찾을 수 없습니다.');
     }
     
-    return { success: true, message: 'Successfully unfollowed user' };
+    return { success: true, message: '언팔로우했습니다.' };
   }
 
   async getFriends(userId: number) {
@@ -323,9 +329,37 @@ export class UsersService {
   }
 
   async addFriend(userId: number, targetId: number) {
-    await this.followUser(userId, targetId);
-    await this.followUser(targetId, userId);
-    return { success: true, message: '친구 추가 완료' };
+    if (userId === targetId) {
+      throw new BadRequestException('자기 자신을 친구로 추가할 수 없습니다.');
+    }
+
+    const targetUser = await this.userRepo.findOne({
+      where: { id: targetId },
+    });
+    if (!targetUser) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    const existingFollow1 = await this.followRepo.findOne({
+      where: { follower: { id: userId }, following: { id: targetId } },
+    });
+    
+    const existingFollow2 = await this.followRepo.findOne({
+      where: { follower: { id: targetId }, following: { id: userId } },
+    });
+
+    if (existingFollow1 && existingFollow2) {
+      throw new ConflictException('이미 친구 관계입니다.');
+    }
+
+    if (!existingFollow1) {
+      await this.followUser(userId, targetId);
+    }
+    if (!existingFollow2) {
+      await this.followUser(targetId, userId);
+    }
+    
+    return { success: true, message: '친구 추가가 완료되었습니다.' };
   }
 
   async getFollowers(userId: number, page = 1, limit = 20) {

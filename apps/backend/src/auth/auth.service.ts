@@ -16,16 +16,16 @@ export class AuthService {
   async validateUser(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('No user found with this email');
+      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 
     if (!user.emailVerified) {
-      throw new UnauthorizedException('Email not verified. Please check your email.');
+      throw new UnauthorizedException('이메일 인증이 완료되지 않았습니다. 이메일을 확인해주세요.');
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      throw new UnauthorizedException('Invalid password');
+      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 
     const { password: _, ...result } = user;
@@ -67,7 +67,7 @@ export class AuthService {
   async verifyEmail(token: string) {
     const user = await this.usersService.verifyEmailToken(token);
     if (!user) {
-      throw new BadRequestException('Invalid or expired verification token');
+      throw new BadRequestException('유효하지 않거나 만료된 인증 토큰입니다.');
     }
 
     return {
@@ -97,7 +97,7 @@ export class AuthService {
   async resetPassword(token: string, newPassword: string) {
     const user = await this.usersService.verifyPasswordResetToken(token);
     if (!user) {
-      throw new BadRequestException('Invalid or expired reset token');
+      throw new BadRequestException('유효하지 않거나 만료된 재설정 토큰입니다.');
     }
 
     await this.usersService.updatePassword(user.id, newPassword);
@@ -119,7 +119,7 @@ export class AuthService {
         accessToken: newAccessToken,
       };
     } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException('유효하지 않은 리프레시 토큰입니다.');
     }
   }
 }

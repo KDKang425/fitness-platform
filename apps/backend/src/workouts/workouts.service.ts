@@ -39,7 +39,7 @@ export class WorkoutsService {
   async startSession(dto: CreateWorkoutSessionDto) {
     return this.dataSource.transaction(async (manager) => {
       const user = await manager.findOne(User, { where: { id: dto.userId } });
-      if (!user) throw new NotFoundException('User not found');
+      if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
 
       const activeSession = await manager.findOne(WorkoutSession, {
         where: {
@@ -59,7 +59,7 @@ export class WorkoutsService {
         });
 
         if (!routine) {
-          throw new NotFoundException('Routine not found');
+          throw new NotFoundException('루틴을 찾을 수 없습니다.');
         }
 
         if (!routine.isPublic && routine.creator?.id !== dto.userId) {
@@ -87,14 +87,14 @@ export class WorkoutsService {
       });
       
       if (!session || session.endTime) {
-        throw new BadRequestException('Invalid session');
+        throw new BadRequestException('유효하지 않은 세션입니다.');
       }
       
       if (!session.pausedIntervals) session.pausedIntervals = [];
       
       const lastPause = session.pausedIntervals[session.pausedIntervals.length - 1];
       if (lastPause && !lastPause.resumedAt) {
-        throw new BadRequestException('Session is already paused');
+        throw new BadRequestException('세션이 이미 일시정지 상태입니다.');
       }
       
       session.pausedIntervals.push({ pausedAt: new Date(), resumedAt: undefined });
@@ -110,16 +110,16 @@ export class WorkoutsService {
       });
       
       if (!session || session.endTime) {
-        throw new BadRequestException('Invalid session');
+        throw new BadRequestException('유효하지 않은 세션입니다.');
       }
       
       if (!session.pausedIntervals || session.pausedIntervals.length === 0) {
-        throw new BadRequestException('Session is not paused');
+        throw new BadRequestException('세션이 일시정지 상태가 아닙니다.');
       }
       
       const lastPause = session.pausedIntervals[session.pausedIntervals.length - 1];
       if (lastPause.resumedAt) {
-        throw new BadRequestException('Session is not paused');
+        throw new BadRequestException('세션이 일시정지 상태가 아닙니다.');
       }
       
       lastPause.resumedAt = new Date();
@@ -138,27 +138,27 @@ export class WorkoutsService {
       throw new BadRequestException('반복 횟수는 100회를 초과할 수 없습니다.');
     }
 
-    const session = await this.sessionRepo.findOne({
-      where: { id: dto.sessionId },
-      relations: ['workoutSets', 'workoutSets.exercise', 'user'],
-    });
-    
-    if (!session) throw new NotFoundException('Session not found');
-    if (session.endTime) {
-      throw new BadRequestException('세션이 이미 종료되었습니다.');
-    }
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager.findOne(WorkoutSession, {
+        where: { id: dto.sessionId },
+        relations: ['workoutSets', 'workoutSets.exercise', 'user'],
+      });
+      
+      if (!session) throw new NotFoundException('세션을 찾을 수 없습니다.');
+      if (session.endTime) {
+        throw new BadRequestException('세션이 이미 종료되었습니다.');
+      }
 
-    const exercise = await this.exerciseRepo.findOneBy({ id: dto.exerciseId });
-    if (!exercise) throw new NotFoundException('Exercise not found');
+      const exercise = await manager.findOne(Exercise, { where: { id: dto.exerciseId } });
+      if (!exercise) throw new NotFoundException('운동을 찾을 수 없습니다.');
 
-    const lastSetOfExercise = session.workoutSets
-      ?.filter(set => set.exercise.id === dto.exerciseId)
-      .sort((a, b) => b.setNumber - a.setNumber)[0];
+      const lastSetOfExercise = session.workoutSets
+        ?.filter(set => set.exercise.id === dto.exerciseId)
+        .sort((a, b) => b.setNumber - a.setNumber)[0];
 
-    const setNumber = dto.setNumber ?? (lastSetOfExercise ? lastSetOfExercise.setNumber + 1 : 1);
-    const volume = calcVolume(dto.reps, dto.weight);
+      const setNumber = dto.setNumber ?? (lastSetOfExercise ? lastSetOfExercise.setNumber + 1 : 1);
+      const volume = calcVolume(dto.reps, dto.weight);
 
-    const savedSet = await this.dataSource.transaction(async (manager) => {
       const set = manager.create(WorkoutSet, {
         workoutSession: session,
         exercise,
@@ -167,22 +167,20 @@ export class WorkoutsService {
         weight: dto.weight,
         volume,
       });
-      await manager.save(set);
+      const savedSet = await manager.save(set);
 
       session.totalVolume += volume;
       await manager.save(session);
 
-      return set;
+      await this.prSvc.updateRecord(
+        session.user.id,
+        exercise.id,
+        dto.weight,
+        dto.reps,
+      );
+
+      return savedSet;
     });
-
-    await this.prSvc.updateRecord(
-      session.user.id,
-      exercise.id,
-      dto.weight,
-      dto.reps,
-    );
-
-    return savedSet;
   }
 
   async finishSession(id: number, endTime?: string) {
@@ -192,7 +190,7 @@ export class WorkoutsService {
         relations: ['workoutSets'],
       });
       
-      if (!session) throw new NotFoundException('Session not found');
+      if (!session) throw new NotFoundException('세션을 찾을 수 없습니다.');
       if (session.endTime) {
         throw new BadRequestException('세션이 이미 종료되었습니다.');
       }
@@ -238,7 +236,7 @@ export class WorkoutsService {
       },
     });
     
-    if (!session) throw new NotFoundException('Session not found');
+    if (!session) throw new NotFoundException('세션을 찾을 수 없습니다.');
     
     return session;
   }
@@ -383,20 +381,20 @@ export class WorkoutsService {
   }
 
   async deleteSet(userId: number, setId: number) {
-    const set = await this.setRepo.findOne({
-      where: { id: setId },
-      relations: ['workoutSession', 'workoutSession.user'],
-    });
+    return this.dataSource.transaction(async (manager) => {
+      const set = await manager.findOne(WorkoutSet, {
+        where: { id: setId },
+        relations: ['workoutSession', 'workoutSession.user'],
+      });
 
-    if (!set) throw new NotFoundException('Set not found');
-    if (set.workoutSession.user.id !== userId) {
-      throw new ForbiddenException('권한이 없습니다.');
-    }
-    if (set.workoutSession.endTime) {
-      throw new BadRequestException('종료된 세션의 세트는 삭제할 수 없습니다.');
-    }
+      if (!set) throw new NotFoundException('세트를 찾을 수 없습니다.');
+      if (set.workoutSession.user.id !== userId) {
+        throw new ForbiddenException('권한이 없습니다.');
+      }
+      if (set.workoutSession.endTime) {
+        throw new BadRequestException('종료된 세션의 세트는 삭제할 수 없습니다.');
+      }
 
-    await this.dataSource.transaction(async (manager) => {
       await manager.delete(WorkoutSet, { id: setId });
       
       await manager.decrement(
@@ -405,8 +403,8 @@ export class WorkoutsService {
         'totalVolume',
         set.volume
       );
-    });
 
-    return { success: true, message: 'Set deleted successfully' };
+      return { success: true, message: '세트가 성공적으로 삭제되었습니다.' };
+    });
   }
 }

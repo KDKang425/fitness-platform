@@ -33,7 +33,7 @@ export class RoutinesService {
     const seen = new Set<number>();
     for (const ex of dto.exercises) {
       if (seen.has(ex.exerciseId))
-        throw new BadRequestException('Duplicate exercise in routine');
+        throw new BadRequestException('루틴에 중복된 운동이 있습니다.');
       seen.add(ex.exerciseId);
     }
 
@@ -65,8 +65,8 @@ export class RoutinesService {
       relations: ['creator'],
     });
 
-    if (!routine) throw new NotFoundException('Routine not found');
-    if (routine.creator?.id !== userId) throw new ForbiddenException('권한이 없습니다.');
+    if (!routine) throw new NotFoundException('루틴을 찾을 수 없습니다.');
+    if (routine.creator?.id !== userId) throw new ForbiddenException('이 루틴을 수정할 권한이 없습니다.');
 
     if (dto.name) routine.name = dto.name;
     if (dto.description !== undefined) routine.description = dto.description;
@@ -78,7 +78,7 @@ export class RoutinesService {
       const seen = new Set<number>();
       for (const ex of dto.exercises) {
         if (seen.has(ex.exerciseId))
-          throw new BadRequestException('Duplicate exercise in routine');
+          throw new BadRequestException('루틴에 중복된 운동이 있습니다.');
         seen.add(ex.exerciseId);
       }
 
@@ -104,11 +104,11 @@ export class RoutinesService {
       relations: ['creator'],
     });
 
-    if (!routine) throw new NotFoundException('Routine not found');
-    if (routine.creator?.id !== userId) throw new ForbiddenException('권한이 없습니다.');
+    if (!routine) throw new NotFoundException('루틴을 찾을 수 없습니다.');
+    if (routine.creator?.id !== userId) throw new ForbiddenException('이 루틴을 삭제할 권한이 없습니다.');
 
     await this.routineRepo.remove(routine);
-    return { success: true, message: 'Routine deleted successfully' };
+    return { success: true, message: '루틴이 삭제되었습니다.' };
   }
 
   async changeVisibility(userId: number, id: number, isPublic: boolean) {
@@ -116,8 +116,8 @@ export class RoutinesService {
       where: { id },
       relations: ['creator'],
     });
-    if (!routine) throw new NotFoundException();
-    if (routine.creator?.id !== userId) throw new ForbiddenException();
+    if (!routine) throw new NotFoundException('루틴을 찾을 수 없습니다.');
+    if (routine.creator?.id !== userId) throw new ForbiddenException('이 루틴의 공개 설정을 변경할 권한이 없습니다.');
 
     routine.isPublic = isPublic;
     return this.routineRepo.save(routine);
@@ -242,7 +242,7 @@ export class RoutinesService {
       ],
     });
 
-    if (!routine) throw new NotFoundException('Routine not found');
+    if (!routine) throw new NotFoundException('루틴을 찾을 수 없습니다.');
 
     if (!routine.isPublic && routine.creator?.id !== userId) {
       throw new ForbiddenException('이 루틴에 접근할 권한이 없습니다.');
@@ -267,7 +267,7 @@ export class RoutinesService {
       relations: ['creator', 'workoutSessions'],
     });
 
-    if (!routine) throw new NotFoundException('Routine not found');
+    if (!routine) throw new NotFoundException('루틴을 찾을 수 없습니다.');
     
     if (!routine.isPublic && routine.creator?.id !== userId) {
       throw new ForbiddenException('이 루틴의 통계에 접근할 권한이 없습니다.');

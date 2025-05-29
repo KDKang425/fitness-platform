@@ -16,6 +16,7 @@ import { WsJwtGuard } from '../auth/ws-jwt.guard';
   },
   namespace: 'workouts',
 })
+@UseGuards(WsJwtGuard)
 export class WorkoutsGateway {
   @WebSocketServer()
   server: Server;
@@ -25,7 +26,10 @@ export class WorkoutsGateway {
     @MessageBody() data: { sessionId: number },
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(`session-${data.sessionId}`);
+    const userId = client.data.user.userId;
+    const room = `session-${data.sessionId}`;
+    
+    client.join(room);
     return { event: 'session:joined', data: { sessionId: data.sessionId } };
   }
 
@@ -34,7 +38,8 @@ export class WorkoutsGateway {
     @MessageBody() data: { sessionId: number },
     @ConnectedSocket() client: Socket,
   ) {
-    client.leave(`session-${data.sessionId}`);
+    const room = `session-${data.sessionId}`;
+    client.leave(room);
     return { event: 'session:left', data: { sessionId: data.sessionId } };
   }
 

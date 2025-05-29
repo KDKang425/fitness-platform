@@ -172,13 +172,12 @@ export class StatsService {
   async getWorkoutFrequency(userId: number) {
     const thirtyDaysAgo = this.addDays(new Date(), -30);
 
-    const sessions = await this.sessionRepo.find({
-      where: {
-        user: { id: userId },
-        startTime: MoreThanOrEqual(thirtyDaysAgo),
-      },
-      select: ['startTime'],
-    });
+    const sessions = await this.sessionRepo
+      .createQueryBuilder('session')
+      .where('session.user.id = :userId', { userId })
+      .andWhere('session.startTime >= :from', { from: thirtyDaysAgo })
+      .select(['session.startTime'])
+      .getMany();
 
     const byDayOfWeek = Array(7).fill(0);
     const byHourOfDay = Array(24).fill(0);
@@ -247,12 +246,13 @@ export class StatsService {
         take: 5,
       }),
 
-      this.sessionRepo.find({
-        where: { user: { id: userId } },
-        order: { startTime: 'DESC' },
-        take: 5,
-        select: ['id', 'date', 'totalVolume', 'totalTime', 'startTime'],
-      }),
+      this.sessionRepo
+        .createQueryBuilder('session')
+        .where('session.user.id = :userId', { userId })
+        .orderBy('session.startTime', 'DESC')
+        .select(['session.id', 'session.date', 'session.totalVolume', 'session.totalTime', 'session.startTime'])
+        .limit(5)
+        .getMany(),
 
       this.getMonthlyStats(userId),
     ]);

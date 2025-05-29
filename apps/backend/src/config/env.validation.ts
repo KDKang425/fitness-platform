@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsNumber, IsString, IsOptional, validateSync, IsNotEmpty, Min, Max, IsIn } from 'class-validator';
+import { IsNumber, IsString, IsOptional, validateSync, IsNotEmpty, Min, Max, IsIn, IsUrl } from 'class-validator';
 
 export class EnvironmentVariables {
   @IsNumber()
@@ -68,6 +68,7 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
+  @IsUrl()
   FRONTEND_URL: string;
 
   @IsOptional()
@@ -92,6 +93,7 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
+  @IsUrl()
   BASE_URL: string;
 
   @IsString()

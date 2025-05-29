@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Exercise, MuscleGroup, ExerciseModality } from './entities/exercise.entity';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
 import { ExerciseFiltersDto } from './dto/exercise-filters.dto';
@@ -21,11 +22,16 @@ export class ExercisesService {
     'Triceps Push-down': 'https://youtube.com/watch?v=2-LAMcpzODU',
   };
 
+  private readonly cacheTTL: number;
+
   constructor(
     @InjectRepository(Exercise)
     private readonly exerciseRepo: Repository<Exercise>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    this.cacheTTL = this.configService.get('CACHE_EXERCISE_TTL', 3600) * 1000;
+  }
 
   async create(dto: CreateExerciseDto) {
     const existing = await this.exerciseRepo.findOne({ 
@@ -33,7 +39,7 @@ export class ExercisesService {
     });
     
     if (existing) {
-      throw new ConflictException(`Exercise with name '${dto.name}' already exists`);
+      throw new ConflictException(`'${dto.name}' 운동이 이미 존재합니다.`);
     }
 
     const exercise = this.exerciseRepo.create({
@@ -47,11 +53,11 @@ export class ExercisesService {
 
     try {
       const saved = await this.exerciseRepo.save(exercise);
-      await this.cacheManager.del('exercises:all');
+      await this.invalidateCache();
       return saved;
     } catch (error: any) {
       if (error?.code === '23505') {
-        throw new ConflictException('Exercise name must be unique');
+        throw new ConflictException('운동 이름은 고유해야 합니다.');
       }
       throw error;
     }
@@ -68,10 +74,10 @@ export class ExercisesService {
     const exercise = await this.exerciseRepo.findOne({ where: { id } });
     
     if (!exercise) {
-      throw new NotFoundException(`Exercise with ID ${id} not found`);
+      throw new NotFoundException(`ID ${id}인 운동을 찾을 수 없습니다.`);
     }
     
-    await this.cacheManager.set(cacheKey, exercise, 3600);
+    await this.cacheManager.set(cacheKey, exercise, this.cacheTTL);
     return exercise;
   }
 
@@ -127,13 +133,13 @@ export class ExercisesService {
         },
       };
 
-      await this.cacheManager.set(cacheKey, result, 1800);
+      await this.cacheManager.set(cacheKey, result, this.cacheTTL / 2);
       return result;
     }
 
     const result = await query.getMany();
     if (!filters) {
-      await this.cacheManager.set(cacheKey, result, 3600);
+      await this.cacheManager.set(cacheKey, result, this.cacheTTL);
     }
     return result;
   }
@@ -182,14 +188,14 @@ export class ExercisesService {
 
   async calculatePlates(targetWeight: number, barWeight = 20, availablePlates = [25, 20, 15, 10, 5, 2.5, 1.25]) {
     if (targetWeight < barWeight) {
-      throw new BadRequestException(`Target weight must be at least ${barWeight}kg (bar weight)`);
+      throw new BadRequestException(`목표 무게는 최소 ${barWeight}kg (바벨 무게) 이상이어야 합니다.`);
     }
 
     const weightToLoad = targetWeight - barWeight;
     const perSide = weightToLoad / 2;
 
     if (perSide % 0.25 !== 0) {
-      throw new BadRequestException('Weight must be divisible by 0.5kg (0.25kg per side)');
+      throw new BadRequestException('무게는 0.5kg 단위(양쪽 0.25kg)로 나누어떨어져야 합니다.');
     }
 
     const plates: number[] = [];
@@ -203,7 +209,7 @@ export class ExercisesService {
     }
 
     if (remaining > 0.01) {
-      throw new BadRequestException('Cannot make exact weight with available plates');
+      throw new BadRequestException('사용 가능한 플레이트로 정확한 무게를 만들 수 없습니다.');
     }
 
     return {
@@ -213,5 +219,10 @@ export class ExercisesService {
       plates,
       totalPlates: plates.length * 2,
     };
+  }
+
+  private async invalidateCache() {
+    await this.cacheManager.del('exercises:all');
+    await this.cacheManager.del('exercises:{}');
   }
 }

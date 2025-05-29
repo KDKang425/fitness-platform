@@ -17,12 +17,12 @@ export class RoutineSubscriptionsService {
 
   async subscribe(userId: number, routineId: number) {
     const routine = await this.routineRepo.findOneBy({ id: routineId, isPublic: true });
-    if (!routine) throw new NotFoundException('Public routine not found');
+    if (!routine) throw new NotFoundException('공개 루틴을 찾을 수 없습니다.');
 
     const exists = await this.subRepo.findOne({
       where: { user: { id: userId }, routine: { id: routineId } },
     });
-    if (exists) throw new ConflictException('Already subscribed');
+    if (exists) throw new ConflictException('이미 구독한 루틴입니다.');
 
     const sub = this.subRepo.create({
       user: { id: userId } as User,
@@ -36,8 +36,8 @@ export class RoutineSubscriptionsService {
       user: { id: userId },
       routine: { id: routineId },
     });
-    if (res.affected === 0) throw new NotFoundException('Subscription not found');
-    return { success: true };
+    if (res.affected === 0) throw new NotFoundException('구독 정보를 찾을 수 없습니다.');
+    return { success: true, message: '구독이 취소되었습니다.' };
   }
 
   listMine(userId: number) {

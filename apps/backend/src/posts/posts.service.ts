@@ -39,7 +39,7 @@ export class PostsService {
     });
     
     if (!post) {
-      throw new NotFoundException(`Post with ID ${id} not found`);
+      throw new NotFoundException(`ID ${id}인 포스트를 찾을 수 없습니다.`);
     }
     
     return post;
@@ -91,7 +91,7 @@ export class PostsService {
     return this.dataSource.transaction(async (manager) => {
       const post = await manager.findOne(Post, { where: { id: postId } });
       if (!post) {
-        throw new NotFoundException('Post not found');
+        throw new NotFoundException('포스트를 찾을 수 없습니다.');
       }
 
       const existingLike = await manager.findOne(Like, {
@@ -99,7 +99,7 @@ export class PostsService {
       });
       
       if (existingLike) {
-        throw new ConflictException('Already liked this post');
+        throw new ConflictException('이미 좋아요한 포스트입니다.');
       }
 
       const like = manager.create(Like, {
@@ -111,7 +111,7 @@ export class PostsService {
       
       await manager.increment(Post, { id: postId }, 'likesCount', 1);
       
-      return { success: true, message: 'Post liked successfully' };
+      return { success: true, message: '포스트에 좋아요를 했습니다.' };
     });
   }
 
@@ -123,12 +123,12 @@ export class PostsService {
       });
       
       if (result.affected === 0) {
-        throw new NotFoundException('Like not found');
+        throw new NotFoundException('좋아요를 찾을 수 없습니다.');
       }
       
       await manager.decrement(Post, { id: postId }, 'likesCount', 1);
       
-      return { success: true, message: 'Post unliked successfully' };
+      return { success: true, message: '좋아요를 취소했습니다.' };
     });
   }
 
@@ -139,7 +139,7 @@ export class PostsService {
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException('포스트를 찾을 수 없습니다.');
     }
 
     if (post.user.id !== userId) {
@@ -147,7 +147,7 @@ export class PostsService {
     }
 
     await this.postRepo.remove(post);
-    return { success: true, message: 'Post deleted successfully' };
+    return { success: true, message: '포스트가 삭제되었습니다.' };
   }
 
   async getUserPosts(userId: number, page = 1, limit = 20) {
