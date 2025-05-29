@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
+import { UsersModule } from '../../../users/users.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { UploadService } from './upload.service';
       }),
       inject: [ConfigService],
     }),
+    forwardRef(() => UsersModule),
   ],
   controllers: [UploadController],
   providers: [UploadService],

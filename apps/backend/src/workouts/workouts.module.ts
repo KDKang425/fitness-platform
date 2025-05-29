@@ -11,6 +11,7 @@ import { Routine } from '../routines/entities/routine.entity';
 import { AuthModule } from '../auth/auth.module';
 import { StatsModule } from '../stats/stats.module';
 import { PersonalRecordsModule } from '../personal-records/personal-records.module';
+import { WorkoutTemplatesModule } from '../workout-templates/workout-templates.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PersonalRecordsModule } from '../personal-records/personal-records.modu
     AuthModule,
     StatsModule,
     PersonalRecordsModule,
+    WorkoutTemplatesModule,
   ],
   controllers: [WorkoutsController],
   providers: [WorkoutsService, WorkoutsGateway],

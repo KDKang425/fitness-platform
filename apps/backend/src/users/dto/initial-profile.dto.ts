@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, Min, Max } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsEnum, Min, Max } from 'class-validator';
 
 export class InitialProfileDto {
   @IsNumber()
@@ -10,6 +10,10 @@ export class InitialProfileDto {
   @Min(30)
   @Max(300)
   weight: number;
+
+  @IsOptional()
+  @IsString()
+  profileImageUrl?: string;
 
   @IsOptional()
   @IsNumber()
@@ -34,4 +38,8 @@ export class InitialProfileDto {
   @Min(0)
   @Max(300)
   overheadPress1RM?: number;
+
+  @IsOptional()
+  @IsEnum(['kg', 'lbs'])
+  preferredUnit?: 'kg' | 'lbs';
 }

@@ -15,6 +15,7 @@ import { WorkoutsService } from './workouts.service';
 import { CreateWorkoutSessionDto } from './dto/create-workout-session.dto';
 import { CreateWorkoutSetDto } from './dto/create-workout-set.dto';
 import { FinishWorkoutSessionDto } from './dto/finish-workout-session.dto';
+import { UpdateWorkoutSetDto } from './dto/update-workout-set.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthRequest } from '../common/interfaces/auth-request.interface';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -38,6 +39,15 @@ export class WorkoutsController {
       ...dto,
       userId: req.user.userId,
     });
+  }
+
+  @ApiOperation({ summary: '템플릿으로 운동 시작' })
+  @Post('start-from-template/:templateId')
+  async startFromTemplate(
+    @Req() req: AuthRequest,
+    @Param('templateId', ParseIntPipe) templateId: number,
+  ) {
+    return this.workoutsService.startSessionFromTemplate(req.user.userId, templateId);
   }
 
   @ApiOperation({ summary: '운동 세션 일시정지' })
@@ -68,6 +78,27 @@ export class WorkoutsController {
     return this.workoutsService.addSet({ ...dto, sessionId: id });
   }
 
+  @ApiOperation({ summary: '운동 세트 수정' })
+  @ApiResponse({ status: 200, description: '세트가 성공적으로 수정됨' })
+  @Patch('sets/:setId')
+  async updateSet(
+    @Req() req: AuthRequest,
+    @Param('setId', ParseIntPipe) setId: number,
+    @Body() dto: UpdateWorkoutSetDto,
+  ) {
+    return this.workoutsService.updateSet(req.user.userId, setId, dto);
+  }
+
+  @ApiOperation({ summary: '운동 세트 삭제' })
+  @ApiResponse({ status: 200, description: '세트가 성공적으로 삭제됨' })
+  @Delete('sets/:setId')
+  async deleteSet(
+    @Req() req: AuthRequest,
+    @Param('setId', ParseIntPipe) setId: number
+  ) {
+    return this.workoutsService.deleteSet(req.user.userId, setId);
+  }
+
   @ApiOperation({ summary: '운동 세션 종료' })
   @ApiResponse({ status: 200, description: '세션이 성공적으로 종료됨' })
   @ApiResponse({ status: 404, description: '세션을 찾을 수 없음' })
@@ -77,7 +108,7 @@ export class WorkoutsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: FinishWorkoutSessionDto,
   ) {
-    return this.workoutsService.finishSession(id, dto.endTime);
+    return this.workoutsService.finishSession(id, dto);
   }
 
   @ApiOperation({ summary: '운동 세션 상세 조회' })
@@ -131,15 +162,5 @@ export class WorkoutsController {
     @Body() dto: any
   ) {
     return this.workoutsService.addManualWorkout(req.user.userId, dto);
-  }
-
-  @ApiOperation({ summary: '운동 세트 삭제' })
-  @ApiResponse({ status: 200, description: '세트가 성공적으로 삭제됨' })
-  @Delete('sets/:setId')
-  async deleteSet(
-    @Req() req: AuthRequest,
-    @Param('setId', ParseIntPipe) setId: number
-  ) {
-    return this.workoutsService.deleteSet(req.user.userId, setId);
   }
 }

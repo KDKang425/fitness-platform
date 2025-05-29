@@ -87,6 +87,9 @@ export class User {
   @Column({ default: true })
   notificationsEnabled: boolean;
 
+  @Column({ default: 'kg', length: 3 })
+  preferredUnit?: 'kg' | 'lbs';
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -131,4 +134,5 @@ export class User {
 
   @OneToMany(() => FriendRequest, (request) => request.recipient)
   receivedFriendRequests: FriendRequest[];
+
 }

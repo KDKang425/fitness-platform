@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, MoreThanOrEqual } from 'typeorm';
-
 import { WorkoutSession } from '../workouts/entities/workout-session.entity';
 import { WorkoutSet } from '../workouts/entities/workout-set.entity';
 import { PersonalRecord } from '../personal-records/entities/personal-record.entity';
 import { MuscleGroup } from '../exercises/entities/muscle-group.enum';
+import { Exercise } from '../exercises/entities/exercise.entity';
+import { User } from '../users/entities/user.entity';
 
 export interface StatsResponse {
   totalVolume: number;
@@ -45,6 +46,10 @@ export class StatsService {
     private readonly setRepo: Repository<WorkoutSet>,
     @InjectRepository(PersonalRecord)
     private readonly prRepo: Repository<PersonalRecord>,
+    @InjectRepository(Exercise)
+    private readonly exerciseRepo: Repository<Exercise>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   async getWeeklyStats(userId: number, base = new Date()): Promise<StatsResponse> {
@@ -278,6 +283,66 @@ export class StatsService {
       },
     };
   }
+
+  async getMainLifts1RM(userId: number) {
+    const mainLifts = {
+      benchPress: 'Barbell Bench Press',
+      squat: 'Barbell Squat',
+      deadlift: 'Deadlift',
+      overheadPress: 'Overhead Press',
+    };
+
+    const result: any = {};
+
+    for (const [key, exerciseName] of Object.entries(mainLifts)) {
+      const exercise = await this.exerciseRepo.findOne({
+        where: { name: exerciseName },
+    });
+
+      if (!exercise) {
+        result[key] = null;
+        continue;
+      }
+
+      const pr = await this.prRepo.findOne({
+        where: { 
+          user: { id: userId },
+          exercise: { id: exercise.id },
+        },
+      });
+
+      if (pr) {
+        result[key] = {
+          weight: pr.bestWeight,
+          reps: pr.bestReps,
+          estimated1RM: pr.estimated1RM,
+          lastUpdated: pr.updatedAt,
+        };
+      } else {
+        const user = await this.userRepo.findOne({
+          where: { id: userId },
+          select: ['benchPress1RM', 'squat1RM', 'deadlift1RM', 'overheadPress1RM'],
+        });
+
+        if (user) {
+          const profileValue = user[`${key}1RM`];
+          if (profileValue) {
+            result[key] = {
+              weight: profileValue,
+              reps: 1,
+              estimated1RM: profileValue,
+              lastUpdated: null,
+              isFromProfile: true,
+            };
+          } else {
+            result[key] = null;
+          }
+        }
+      }
+    }
+
+    return result;
+}
 
   private startOfDay(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);

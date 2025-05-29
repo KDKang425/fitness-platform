@@ -30,6 +30,7 @@ import { UserProgramsModule } from './programs/user-programs.module';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -127,6 +128,7 @@ import { validate } from './config/env.validation';
     AdminModule,
     WorkoutTemplatesModule,
     UserProgramsModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [AppService],

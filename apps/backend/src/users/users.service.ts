@@ -5,9 +5,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, MoreThan, DataSource } from 'typeorm';
 import { User, UserRole } from './entities/user.entity';
 import { Follow } from './entities/follow.entity';
+import { BodyRecord } from '../body-records/entities/body-record.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InitialProfileDto } from './dto/initial-profile.dto';
@@ -24,6 +25,7 @@ export class UsersService {
     @InjectRepository(Follow)
     private readonly followRepo: Repository<Follow>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly dataSource: DataSource,
   ) {}
 
   async createUser(dto: CreateUserDto): Promise<User> {
@@ -193,9 +195,23 @@ export class UsersService {
     user.benchPress1RM = dto.benchPress1RM;
     user.squat1RM = dto.squat1RM;
     user.deadlift1RM = dto.deadlift1RM;
+    user.overheadPress1RM = dto.overheadPress1RM;
+    
+    if (dto.profileImageUrl) {
+      user.profileImageUrl = dto.profileImageUrl;
+    }
+    
     user.hasCompletedInitialSetup = true;
 
     const updated = await this.userRepo.save(user);
+    
+    const bodyRecordRepo = this.dataSource.getRepository(BodyRecord);
+    await bodyRecordRepo.save({
+      user: { id: userId },
+      weight: dto.weight,
+      date: new Date().toISOString().split('T')[0],
+    });
+
     const { password, ...result } = updated;
     return result;
   }

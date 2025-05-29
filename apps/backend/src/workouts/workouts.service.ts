@@ -12,13 +12,19 @@ import { WorkoutSet } from './entities/workout-set.entity';
 import { Exercise } from '../exercises/entities/exercise.entity';
 import { User } from '../users/entities/user.entity';
 import { Routine } from '../routines/entities/routine.entity';
+import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
+import { Post } from '../posts/entities/post.entity';
+import { UserProgram } from '../programs/entities/user-program.entity';
 
 import { CreateWorkoutSessionDto, WorkoutType } from './dto/create-workout-session.dto';
 import { CreateWorkoutSetDto } from './dto/create-workout-set.dto';
+import { FinishWorkoutSessionDto } from './dto/finish-workout-session.dto';
+import { UpdateWorkoutSetDto } from './dto/update-workout-set.dto';
 
 import { calcVolume } from '../common/utils/volume.util';
 import { PersonalRecordsService } from '../personal-records/personal-records.service';
 import { StatsBatchService } from '../stats/stats-batch.service';
+import { WorkoutTemplatesService } from '../workout-templates/workout-templates.service';
 
 @Injectable()
 export class WorkoutsService {
@@ -36,6 +42,7 @@ export class WorkoutsService {
     private readonly dataSource: DataSource,
     private readonly prSvc: PersonalRecordsService,
     private readonly statsBatchService: StatsBatchService,
+    private readonly templateService: WorkoutTemplatesService,
   ) {}
 
   async startSession(dto: CreateWorkoutSessionDto) {
@@ -84,6 +91,56 @@ export class WorkoutsService {
       });
       
       return manager.save(session);
+    });
+  }
+
+  async startSessionFromTemplate(userId: number, templateId: number) {
+    return this.dataSource.transaction(async (manager) => {
+      const template = await manager.findOne(WorkoutTemplate, {
+        where: { id: templateId, user: { id: userId } },
+      });
+
+      if (!template) {
+        throw new NotFoundException('템플릿을 찾을 수 없습니다.');
+      }
+
+      const activeSession = await manager.findOne(WorkoutSession, {
+        where: {
+          user: { id: userId },
+          endTime: IsNull(),
+        },
+      });
+
+      if (activeSession) {
+        throw new BadRequestException('이미 진행 중인 운동 세션이 있습니다.');
+      }
+
+      const kstDate = new Date();
+      kstDate.setHours(kstDate.getHours() + 9);
+      const dateStr = kstDate.toISOString().split('T')[0];
+
+      const session = await manager.save(WorkoutSession, {
+        user: { id: userId },
+        date: dateStr,
+        startTime: new Date(),
+        totalVolume: 0,
+        pausedIntervals: [],
+        totalPausedTime: 0,
+      });
+
+      await this.templateService.incrementUsage(templateId);
+
+      const plannedExercises = template.exercises.map(ex => ({
+        sessionId: session.id,
+        exerciseId: ex.exerciseId,
+        exerciseName: ex.exerciseName,
+        plannedSets: ex.sets,
+      }));
+
+      return {
+        session,
+        plannedExercises,
+      };
     });
   }
 
@@ -190,11 +247,89 @@ export class WorkoutsService {
     });
   }
 
-  async finishSession(id: number, endTime?: string) {
+  async updateSet(userId: number, setId: number, dto: UpdateWorkoutSetDto) {
+    return this.dataSource.transaction(async (manager) => {
+      const set = await manager.findOne(WorkoutSet, {
+        where: { id: setId },
+        relations: ['workoutSession', 'workoutSession.user', 'exercise'],
+      });
+
+      if (!set) throw new NotFoundException('세트를 찾을 수 없습니다.');
+      if (set.workoutSession.user.id !== userId) {
+        throw new ForbiddenException('권한이 없습니다.');
+      }
+      if (set.workoutSession.endTime) {
+        throw new BadRequestException('종료된 세션의 세트는 수정할 수 없습니다.');
+      }
+
+      const oldVolume = set.volume;
+
+      if (dto.reps !== undefined) set.reps = dto.reps;
+      if (dto.weight !== undefined) set.weight = dto.weight;
+
+      const newVolume = calcVolume(set.reps, set.weight);
+      set.volume = newVolume;
+
+      await manager.save(set);
+
+      const volumeDiff = newVolume - oldVolume;
+      await manager.increment(
+        WorkoutSession,
+        { id: set.workoutSession.id },
+        'totalVolume',
+        volumeDiff
+      );
+
+      await this.prSvc.updateRecord(
+        userId,
+        set.exercise.id,
+        set.weight,
+        set.reps,
+      );
+
+      return set;
+    });
+  }
+
+  private async createWorkoutPost(
+    manager: any,
+    userId: number,
+    sessionId: number,
+    content?: string,
+    imageUrl?: string,
+  ) {
+    const session = await manager.findOne(WorkoutSession, {
+      where: { id: sessionId },
+      relations: ['workoutSets', 'workoutSets.exercise'],
+    });
+
+    let autoContent = content;
+    if (!autoContent) {
+      const exerciseNames = [...new Set(
+        session.workoutSets.map(set => set.exercise.name)
+      )];
+      const totalSets = session.workoutSets.length;
+      
+      autoContent = `오늘의 운동 완료! 💪\n${exerciseNames.slice(0, 3).join(', ')}${
+        exerciseNames.length > 3 ? ` 외 ${exerciseNames.length - 3}개` : ''
+      }\n총 ${totalSets}세트, ${session.totalVolume.toLocaleString()}kg`;
+    }
+
+    const post = manager.create(Post, {
+      user: { id: userId },
+      workoutSession: { id: sessionId },
+      content: autoContent,
+      imageUrl: imageUrl,
+    });
+
+    return manager.save(post);
+  }
+
+  async finishSession(id: number, dto: FinishWorkoutSessionDto) {
     return this.dataSource.transaction(async (manager) => {
       const session = await manager.findOne(WorkoutSession, {
         where: { id },
-        relations: ['workoutSets', 'user'],
+        relations: ['workoutSets', 'user', 'routine'],
       });
       
       if (!session) throw new NotFoundException('세션을 찾을 수 없습니다.');
@@ -208,7 +343,7 @@ export class WorkoutsService {
         throw new BadRequestException('운동 기록이 없는 세션은 종료할 수 없습니다.');
       }
 
-      const finishedAt = endTime ? new Date(endTime) : new Date();
+      const finishedAt = dto.endTime ? new Date(dto.endTime) : new Date();
       
       if (finishedAt <= session.startTime) {
         throw new BadRequestException('종료 시간은 시작 시간 이후여야 합니다.');
@@ -223,6 +358,48 @@ export class WorkoutsService {
       session.totalTime = actualDurationSec;
 
       const saved = await manager.save(session);
+
+      if (dto.postToFeed) {
+        await this.createWorkoutPost(
+          manager,
+          session.user.id,
+          session.id,
+          dto.postContent,
+          dto.postImageUrl,
+        );
+      }
+
+      if (session.routine) {
+        const program = await manager.findOne(UserProgram, {
+          where: {
+            user: { id: session.user.id },
+            routine: { id: session.routine.id },
+            isActive: true,
+          },
+        });
+
+        if (program) {
+          program.completedSessions += 1;
+          
+          const totalSessions = 28;
+          const progressPercentage = (program.completedSessions / totalSessions) * 100;
+
+          if (program.progress) {
+            program.progress.lastSessionId = session.id;
+            const weekNumber = Math.floor(program.completedSessions / 7) + 1;
+            const dayNumber = (program.completedSessions % 7) || 7;
+            program.progress.week = weekNumber;
+            program.progress.day = dayNumber;
+          }
+
+          if (program.completedSessions >= totalSessions) {
+            program.isActive = false;
+            program.endDate = new Date().toISOString().split('T')[0];
+          }
+
+          await manager.save(program);
+        }
+      }
 
       await this.statsBatchService.updateRealtimeStats(session.user.id, id);
 

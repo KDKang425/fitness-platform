@@ -6,6 +6,7 @@ import { User } from './entities/user.entity';
 import { Follow } from './entities/follow.entity';
 import { FriendRequest } from './entities/friend-request.entity';
 import { FriendRequestService } from './friend-request.service';
+import { FriendRequestController } from './friend-request.controller';
 import { NotificationModule } from '../notification/notification.module';
 
 @Module({
@@ -13,7 +14,7 @@ import { NotificationModule } from '../notification/notification.module';
     TypeOrmModule.forFeature([User, Follow, FriendRequest]),
     NotificationModule,
   ],
-  controllers: [UsersController],
+  controllers: [UsersController, FriendRequestController],
   providers: [UsersService, FriendRequestService],
   exports: [UsersService, FriendRequestService],
 })
