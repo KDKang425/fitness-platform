@@ -1,6 +1,7 @@
-import { Controller, Get, Post as PostMethod, Body, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post as PostMethod, Body, Param, ParseIntPipe, UseGuards, Req, Delete } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('posts')
 export class PostsController {
@@ -19,5 +20,23 @@ export class PostsController {
   @Get()
   findAll() {
     return this.postsService.findAll();
+  }
+
+  @PostMethod(':id/likes')
+  @UseGuards(JwtAuthGuard)
+  async likePost(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) postId: number,
+  ) {
+    return this.postsService.likePost(req.user.userId, postId);
+  }
+
+  @Delete(':id/likes')
+  @UseGuards(JwtAuthGuard)
+  async unlikePost(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) postId: number,
+  ) {
+    return this.postsService.unlikePost(req.user.userId, postId);
   }
 }

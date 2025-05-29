@@ -34,4 +34,42 @@ export class UsersController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.remove(id);
   }
+
+  @Post('follow/:targetId')
+  @UseGuards(JwtAuthGuard)
+  async follow(
+    @Req() req: any,
+    @Param('targetId', ParseIntPipe) targetId: number,
+  ) {
+    return this.usersService.followUser(req.user.userId, targetId);
+  }
+
+  @Delete('follow/:targetId')
+  @UseGuards(JwtAuthGuard)
+  async unfollow(
+    @Req() req: any,
+    @Param('targetId', ParseIntPipe) targetId: number,
+  ) {
+    return this.usersService.unfollowUser(req.user.userId, targetId);
+  }
+
+  @Get('followers/:userId?')
+  @UseGuards(JwtAuthGuard)
+  async getFollowers(
+    @Req() req: any,
+    @Param('userId', ParseIntPipe) userId?: number,
+  ) {
+    const targetUserId = userId || req.user.userId;
+    return this.usersService.getFollowers(targetUserId);
+  }
+
+  @Get('following/:userId?')
+  @UseGuards(JwtAuthGuard)
+  async getFollowing(
+    @Req() req: any,
+    @Param('userId', ParseIntPipe) userId?: number,
+  ) {
+    const targetUserId = userId || req.user.userId;
+    return this.usersService.getFollowing(targetUserId);
+  }
 }

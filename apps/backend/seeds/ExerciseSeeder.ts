@@ -11,7 +11,7 @@ export default class ExerciseSeeder implements Seeder {
     const seeds: Partial<Exercise>[] = [
       { name: 'Barbell Bench Press', category: MuscleGroup.CHEST, modality: ExerciseModality.BARBELL },
       { name: 'Pull-Up',     category: MuscleGroup.BACK,  modality: ExerciseModality.BODYWEIGHT },
-      { name: 'Barbell Squat',     category: MuscleGroup.QUADRICEPS /* dummy */, modality: ExerciseModality.CARDIO },
+      { name: 'Barbell Squat',     category: MuscleGroup.QUADRICEPS, modality: ExerciseModality.BARBELL },
     ];
 
     for (let i = 0; i < 17; i++) {

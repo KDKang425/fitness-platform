@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
@@ -35,12 +35,40 @@ export class PostsService {
     return this.postRepo.find();
   }
 
-  /** 좋아요 등록 */
   async likePost(userId: number, postId: number) {
+    const existingLike = await this.likeRepo.findOne({
+      where: { user: { id: userId }, post: { id: postId } },
+    });
+    
+    if (existingLike) {
+      throw new ConflictException('Already liked this post');
+    }
+
     const like = this.likeRepo.create({
       user: { id: userId } as any,
       post: { id: postId } as any,
     });
-    return this.likeRepo.save(like);
+    
+    const savedLike = await this.likeRepo.save(like);
+    
+    await this.postRepo.increment({ id: postId }, 'likesCount', 1);
+    
+    return savedLike;
+  }
+
+  async unlikePost(userId: number, postId: number) {
+    const result = await this.likeRepo.delete({
+      user: { id: userId },
+      post: { id: postId },
+    });
+    
+    if (result.affected === 0) {
+      throw new NotFoundException('Like not found');
+    }
+    
+    await this.postRepo.decrement({ id: postId }, 'likesCount', 1);
+    
+    return { success: true };
   }
 }
+
