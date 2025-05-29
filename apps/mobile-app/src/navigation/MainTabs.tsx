@@ -4,8 +4,8 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import HomeStack from './HomeStack'
 import StatsScreen from '../screens/StatsScreen'
 import RecordStack from './RecordStack'
-import ExploreScreen from '../screens/ExploreScreen'
-import SocialScreen from '../screens/SocialScreen'
+import ExploreStack from './ExploreStack'
+import SocialStack from './SocialStack'
 
 const Tab = createBottomTabNavigator()
 
@@ -26,8 +26,8 @@ export default function MainTabs() {
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Stats" component={StatsScreen} />
       <Tab.Screen name="Record" component={RecordStack} />
-      <Tab.Screen name="Explore" component={ExploreScreen} />
-      <Tab.Screen name="Social" component={SocialScreen} />
+      <Tab.Screen name="Explore" component={ExploreStack} />
+      <Tab.Screen name="Social" component={SocialStack} />
     </Tab.Navigator>
   )
 }
