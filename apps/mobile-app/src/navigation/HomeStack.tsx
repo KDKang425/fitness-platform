@@ -8,15 +8,9 @@ import ProgramStartScreen from '../screens/ProgramStartScreen'
 import FreeWorkoutScreen from '../screens/FreeWorkoutScreen'
 import RoutineCreateScreen from '../screens/RoutineCreateScreen'
 import WorkoutSessionScreen from '../screens/WorkoutSessionScreen'
-
-export type HomeStackParamList = {
-  Home: undefined
-  Settings: undefined
-  ProgramStart: undefined
-  FreeWorkout: undefined
-  RoutineCreate: undefined
-  WorkoutSession: { sessionId: number }
-}
+import ExerciseDetailScreen from '../screens/ExerciseDetailScreen'
+import AllExercisesScreen from '../screens/AllExercisesScreen'
+import { HomeStackParamList } from '../types/navigation'
 
 const Stack = createNativeStackNavigator<HomeStackParamList>()
 
@@ -28,7 +22,6 @@ export default function HomeStack() {
         headerTintColor: '#ff7f27',
       }}
     >
-      {/* 홈 */}
       <Stack.Screen
         name="Home"
         component={HomeScreen}
@@ -45,23 +38,13 @@ export default function HomeStack() {
           ),
         })}
       />
-
-      {/* 설정 */}
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: '설정' }} />
-
-      {/* 프로그램 / 자유 운동 시작 */}
       <Stack.Screen name="ProgramStart" component={ProgramStartScreen} options={{ title: '프로그램 시작' }} />
-      <Stack.Screen name="FreeWorkout"   component={FreeWorkoutScreen}   options={{ title: '자유 운동'     }} />
-
-      {/* 루틴 생성 */}
+      <Stack.Screen name="FreeWorkout" component={FreeWorkoutScreen} options={{ title: '자유 운동' }} />
       <Stack.Screen name="RoutineCreate" component={RoutineCreateScreen} options={{ title: '루틴 생성' }} />
-
-      {/* 🎯 새로 추가 – 실제 운동 세션 진행 화면 */}
-      <Stack.Screen
-        name="WorkoutSession"
-        component={WorkoutSessionScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="WorkoutSession" component={WorkoutSessionScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} options={{ title: '운동 상세' }} />
+      <Stack.Screen name="AllExercises" component={AllExercisesScreen} options={{ title: '모든 운동' }} />
     </Stack.Navigator>
   )
 }

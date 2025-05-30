@@ -1,97 +1,110 @@
-// utils/api.ts - 디버깅 버전
 import axios from 'axios'
-import Constants from 'expo-constants'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import Constants from 'expo-constants'
+import { showToast } from './Toast'
 
-function getBaseUrl() {
-  const host = Constants.manifest?.debuggerHost?.split(':')[0]
-  console.log('Debug Host:', host)
-  
-  if (host) {
-    const url = `http://192.168.0.12:3001/api/v1`
-    console.log('Development API URL:', url)
-    return url
+// 환경에 따른 BASE URL 설정
+function getBaseUrl(): string {
+  // 환경변수에서 먼저 확인
+  const envUrl = process.env.API_URL
+  if (envUrl) {
+    console.log('Using API URL from env:', envUrl)
+    return envUrl
+  }
+
+  // 개발 환경에서 디버거 호스트 사용
+  const debuggerHost = Constants.expoConfig?.hostUri?.split(':')[0]
+  if (debuggerHost) {
+    const devUrl = `http://${debuggerHost}:3001/api/v1`
+    console.log('Using development API URL:', devUrl)
+    return devUrl
   }
   
-  const prodUrl = 'https://your-production-domain.com/api/v1'
-  console.log('Production API URL:', prodUrl)
-  return prodUrl
+  // 기본값
+  const defaultUrl = 'http://localhost:3001/api/v1'
+  console.log('Using default API URL:', defaultUrl)
+  return defaultUrl
 }
 
 const api = axios.create({
   baseURL: getBaseUrl(),
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   }
 })
 
-// 요청 인터셉터에 로깅 추가
+// 요청 인터셉터
 api.interceptors.request.use(async (config) => {
-  console.log('API Request:', {
-    method: config.method?.toUpperCase(),
-    url: config.url,
-    baseURL: config.baseURL,
-    fullURL: `${config.baseURL}${config.url}`,
-    data: config.data
-  })
+  console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`)
   
-  const token = await AsyncStorage.getItem('accessToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-    console.log('Authorization header added')
+  try {
+    const token = await AsyncStorage.getItem('accessToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } catch (error) {
+    console.warn('Failed to get access token:', error)
   }
+  
   return config
+}, (error) => {
+  console.error('Request interceptor error:', error)
+  return Promise.reject(error)
 })
 
-// 응답 인터셉터에 로깅 추가
+// 응답 인터셉터
 api.interceptors.response.use(
-  (res) => {
-    console.log('API Response Success:', {
-      status: res.status,
-      statusText: res.statusText,
-      data: res.data
-    })
-    return res
+  (response) => {
+    console.log(`✅ API Response: ${response.status} ${response.config.url}`)
+    return response
   },
   async (error) => {
-    console.log('API Response Error:', {
+    const original = error.config
+    
+    console.error(`❌ API Error: ${error.response?.status || 'Network'} ${original?.url}`, {
       message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      config: {
-        method: error.config?.method,
-        url: error.config?.url,
-        baseURL: error.config?.baseURL
-      }
+      data: error.response?.data
     })
 
-    const original = error.config as any
+    // 401 에러 처리 (토큰 갱신)
     if (
       error.response?.status === 401 &&
       !original._retry &&
-      !(original?.url ?? '').includes('/auth/refresh')
+      !original?.url?.includes('/auth/')
     ) {
       original._retry = true
-      const rt = await AsyncStorage.getItem('refreshToken')
-      if (rt) {
-        try {
-          const resp = await axios.post(`${getBaseUrl()}/auth/refresh`, { refreshToken: rt })
-          const { accessToken, refreshToken } = resp.data
+      
+      try {
+        const refreshToken = await AsyncStorage.getItem('refreshToken')
+        if (refreshToken) {
+          const response = await axios.post(`${getBaseUrl()}/auth/refresh`, {
+            refreshToken
+          })
+          
+          const { accessToken, refreshToken: newRefreshToken } = response.data
           await AsyncStorage.setItem('accessToken', accessToken)
-          await AsyncStorage.setItem('refreshToken', refreshToken)
+          await AsyncStorage.setItem('refreshToken', newRefreshToken)
+          
           original.headers.Authorization = `Bearer ${accessToken}`
           return api(original)
-        } catch {
-          await AsyncStorage.removeItem('accessToken')
-          await AsyncStorage.removeItem('refreshToken')
         }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError)
+        await AsyncStorage.multiRemove(['accessToken', 'refreshToken'])
+        showToast('세션이 만료되었습니다. 다시 로그인해주세요.')
       }
     }
+
+    // 네트워크 에러 처리
+    if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
+      showToast('네트워크 연결을 확인해주세요.')
+    } else if (error.response?.status >= 500) {
+      showToast('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+    }
+
     return Promise.reject(error)
-  },
+  }
 )
 
 export default api
