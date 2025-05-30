@@ -9,7 +9,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   useEffect(() => {
     const fetchProgram = async () => {
       try {
-        const res = await api.get('/routines/active')
+        const res = await api.get('/programs/active')
         setProgram(res.data)
       } catch {}
       setLoading(false)

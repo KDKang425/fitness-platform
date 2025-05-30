@@ -34,7 +34,14 @@ export default function SocialScreen({ navigation }: SocialScreenProps) {
       const response = await api.get('/posts/feed', {
         params: { filter, sort }
       })
-      setPosts(response.data.posts || [])
+      // Parse posts and set default isLiked to false since backend doesn't provide it
+      const postsData = response.data.posts || response.data || []
+      const postsWithLiked = postsData.map((post: any) => ({
+        ...post,
+        isLiked: false, // Backend doesn't provide this yet
+        caption: post.content || '' // Map content to caption
+      }))
+      setPosts(postsWithLiked)
     } catch (error) {
       // 더미 데이터로 대체
       const dummyPosts: Post[] = Array.from({ length: 15 }, (_, i) => ({

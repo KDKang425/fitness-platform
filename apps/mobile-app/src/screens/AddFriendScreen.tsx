@@ -40,7 +40,7 @@ export default function AddFriendScreen({ navigation }: Props) {
 
   const sendFriendRequest = async (userId: number) => {
     try {
-      await api.post(`/friends/${userId}/request`)
+      await api.post(`/friend-requests/${userId}`)
       showToast('친구 요청을 보냈습니다.')
     } catch (error) {
       showToast('친구 요청을 보낼 수 없습니다.')

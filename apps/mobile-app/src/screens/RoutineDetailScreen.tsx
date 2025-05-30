@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native'
 import api from '../utils/api'
 
-export default function RoutineDetailScreen({ route }: { route: any }) {
+export default function RoutineDetailScreen({ route, navigation }: { route: any; navigation: any }) {
   const { id } = route.params
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
@@ -31,8 +31,17 @@ export default function RoutineDetailScreen({ route }: { route: any }) {
 
   const onSubscribe = async () => {
     try {
+      // First subscribe to the routine
       await api.post(`/routine-subscriptions/${id}`)
-    } catch {}
+      
+      // Then start the program
+      await api.post(`/programs/start/${id}`)
+      
+      // Navigate to home to see the active program
+      navigation.replace('MainTabs', { screen: 'Home' })
+    } catch (error) {
+      console.error('Failed to subscribe or start program:', error)
+    }
     setSubscribed(true)
   }
 

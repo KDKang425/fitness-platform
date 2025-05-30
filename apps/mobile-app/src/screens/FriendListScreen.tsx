@@ -27,7 +27,7 @@ export default function FriendListScreen({ navigation }: Props) {
   const fetchFriends = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/friends')
+      const response = await api.get('/users/friends')
       setFriends(response.data)
     } catch (error) {
       // 더미 데이터
@@ -48,9 +48,9 @@ export default function FriendListScreen({ navigation }: Props) {
       if (!friend) return
 
       if (friend.isFollowing) {
-        await api.delete(`/friends/${friendId}/unfollow`)
+        await api.delete(`/users/follow/${friendId}`)
       } else {
-        await api.post(`/friends/${friendId}/follow`)
+        await api.post(`/users/follow/${friendId}`)
       }
 
       setFriends(prev => 

@@ -5,16 +5,16 @@ import { showToast } from './Toast'
 
 // 환경에 따른 BASE URL 설정
 function getBaseUrl(): string {
-  // 환경변수에서 먼저 확인
-  const envUrl = process.env.API_URL
+  // 환경변수에서 먼저 확인 - React Native에서는 process.env가 동작하지 않으므로 Constants를 사용
+  const envUrl = Constants.expoConfig?.extra?.apiUrl || Constants.manifest?.extra?.apiUrl
   if (envUrl) {
     console.log('Using API URL from env:', envUrl)
-    return envUrl
+    return `${envUrl}/api/v1`
   }
 
   // 개발 환경에서 디버거 호스트 사용
-  const debuggerHost = Constants.expoConfig?.hostUri?.split(':')[0]
-  if (debuggerHost) {
+  const debuggerHost = Constants.expoConfig?.hostUri?.split(':')[0] || Constants.manifest?.debuggerHost?.split(':')[0]
+  if (debuggerHost && debuggerHost !== 'localhost') {
     const devUrl = `http://${debuggerHost}:3001/api/v1`
     console.log('Using development API URL:', devUrl)
     return devUrl
@@ -57,6 +57,12 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => {
     console.log(`✅ API Response: ${response.status} ${response.config.url}`)
+    
+    // Unwrap backend response format
+    if (response.data && typeof response.data === 'object' && 'success' in response.data && 'data' in response.data) {
+      response.data = response.data.data
+    }
+    
     return response
   },
   async (error) => {
@@ -82,7 +88,9 @@ api.interceptors.response.use(
             refreshToken
           })
           
-          const { accessToken, refreshToken: newRefreshToken } = response.data
+          // Handle wrapped response from backend
+          const responseData = response.data.data || response.data
+          const { accessToken, refreshToken: newRefreshToken } = responseData
           await AsyncStorage.setItem('accessToken', accessToken)
           await AsyncStorage.setItem('refreshToken', newRefreshToken)
           

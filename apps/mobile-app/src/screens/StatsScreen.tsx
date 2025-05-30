@@ -15,10 +15,27 @@ export default function StatsScreen() {
     setLoading(true)
     try {
       const apiPath = mode === 'week' ? 'weekly' : 'monthly'
-      const cur = await api.get(`/stats/${apiPath}`)
-      const prev = await api.get(`/stats/${apiPath}?prev=1`)
-      setCurrent(cur.data)
-      setPrevious(prev.data)
+      const { data } = await api.get(`/stats/${apiPath}`)
+      
+      // Transform backend response to expected format
+      const transformed: StatRes = [
+        { label: '총볼륨', value: data.totalVolume },
+        ...data.perMuscleGroup.map((mg: any) => ({
+          label: mg.muscle_group,
+          value: mg.volume
+        }))
+      ]
+      
+      const transformedPrev: StatRes = [
+        { label: '총볼륨', value: data.prevTotalVolume },
+        ...data.perMuscleGroup.map((mg: any) => ({
+          label: mg.muscle_group,
+          value: Math.round(mg.volume * (data.prevTotalVolume / data.totalVolume))
+        }))
+      ]
+      
+      setCurrent(transformed)
+      setPrevious(transformedPrev)
     } catch {
       const dummy: StatRes = [
         { label: '총볼륨', value: mode === 'week' ? 32000 : 128000 },
