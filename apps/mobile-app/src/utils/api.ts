@@ -2,6 +2,7 @@ import axios from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import Constants from 'expo-constants'
 import { showToast } from './Toast'
+import { ErrorHandler } from './errorHandler'
 
 // 환경에 따른 BASE URL 설정
 function getBaseUrl(): string {

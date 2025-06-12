@@ -22,7 +22,7 @@ export default function SocialScreen({ navigation }: SocialScreenProps) {
   const [loading, setLoading] = useState(true)
   const [posts, setPosts] = useState<Post[]>([])
   const [filter, setFilter] = useState<'all' | 'following'>('all')
-  const [sort, setSort] = useState<'latest' | 'popular'>('latest')
+  const [sort, setSort] = useState<'recent' | 'popular'>('recent')
 
   useEffect(() => {
     fetchPosts()
@@ -92,10 +92,10 @@ export default function SocialScreen({ navigation }: SocialScreenProps) {
       {/* 정렬 버튼 */}
       <View style={styles.sortRow}>
         <TouchableOpacity
-          style={[styles.sortButton, sort === 'latest' && styles.sortButtonActive]}
-          onPress={() => setSort('latest')}
+          style={[styles.sortButton, sort === 'recent' && styles.sortButtonActive]}
+          onPress={() => setSort('recent')}
         >
-          <Text style={[styles.sortText, sort === 'latest' && styles.sortTextActive]}>
+          <Text style={[styles.sortText, sort === 'recent' && styles.sortTextActive]}>
             최신순
           </Text>
         </TouchableOpacity>

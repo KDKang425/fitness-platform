@@ -42,7 +42,7 @@ export class PostsService {
     return this.postRepo.save(post);
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, userId?: number) {
     const post = await this.postRepo.findOne({ 
       where: { id },
       relations: ['user', 'workoutSession'],
@@ -52,10 +52,15 @@ export class PostsService {
       throw new NotFoundException(`ID ${id}인 포스트를 찾을 수 없습니다.`);
     }
     
-    return post;
+    if (userId) {
+      const [postWithLike] = await this.addIsLikedToPosts([post], userId);
+      return postWithLike;
+    }
+    
+    return { ...post, isLiked: false };
   }
 
-  async findAll(page = 1, limit = 20, sort = 'recent') {
+  async findAll(page = 1, limit = 20, sort = 'recent', userId?: number) {
     const query = this.postRepo.createQueryBuilder('post')
       .leftJoinAndSelect('post.user', 'user')
       .select([
@@ -86,8 +91,12 @@ export class PostsService {
       .take(limit)
       .getManyAndCount();
 
+    const postsWithLikes = userId 
+      ? await this.addIsLikedToPosts(posts, userId)
+      : posts.map(post => ({ ...post, isLiked: false }));
+
     return {
-      posts,
+      posts: postsWithLikes,
       pagination: {
         page,
         limit,
@@ -542,8 +551,10 @@ export class PostsService {
         .take(limit)
         .getManyAndCount();
 
+      const postsWithLikes = await this.addIsLikedToPosts(posts, userId);
+
       return {
-        posts,
+        posts: postsWithLikes,
         pagination: {
           page,
           limit,
@@ -552,7 +563,12 @@ export class PostsService {
         },
       };
     } else {
-      return this.getPersonalizedFeed(userId, page, limit);
+      const result = await this.getPersonalizedFeed(userId, page, limit);
+      const postsWithLikes = await this.addIsLikedToPosts(result.posts, userId);
+      return {
+        ...result,
+        posts: postsWithLikes,
+      };
     }
   }
   async update(userId: number, postId: number, dto: UpdatePostDto) {
@@ -567,4 +583,27 @@ export class PostsService {
   if (dto.imageUrl !== undefined) post.imageUrl = dto.imageUrl;
   return this.postRepo.save(post);
 }
+
+  private async addIsLikedToPosts(posts: Post[], userId: number): Promise<any[]> {
+    if (!userId || posts.length === 0) {
+      return posts.map(post => ({ ...post, isLiked: false }));
+    }
+
+    const postIds = posts.map(post => post.id);
+    const likes = await this.likeRepo.find({
+      where: {
+        user: { id: userId },
+        post: { id: In(postIds) },
+      },
+      select: ['post'],
+      relations: ['post'],
+    });
+
+    const likedPostIds = new Set(likes.map(like => like.post.id));
+
+    return posts.map(post => ({
+      ...post,
+      isLiked: likedPostIds.has(post.id),
+    }));
+  }
 }

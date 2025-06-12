@@ -38,7 +38,7 @@ export default function CreatePostScreen({ navigation }: Props) {
       setLoading(true)
       await api.post('/posts', {
         imageUrl: imageUri,
-        caption: caption.trim()
+        content: caption.trim()
       })
       showToast('게시글이 업로드되었습니다.')
       navigation.goBack()

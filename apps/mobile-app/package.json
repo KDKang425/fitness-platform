@@ -9,7 +9,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -33,7 +36,10 @@
     "react-native-svg": "15.11.2",
     "react-native-swipe-list-view": "^3.2.9",
     "victory-native": "^41.17.3",
-    "@react-native-community/datetimepicker": "8.3.0"
+    "@react-native-community/datetimepicker": "8.3.0",
+    "@react-native-community/netinfo": "11.9.1",
+    "expo-notifications": "~0.29.14",
+    "expo-device": "~6.0.3"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

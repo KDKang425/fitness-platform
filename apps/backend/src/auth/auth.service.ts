@@ -18,8 +18,12 @@ export class AuthService {
   async validateUser(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
     if (!user) throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
-    //if (!user.emailVerified)
-      //throw new UnauthorizedException('이메일 인증이 완료되지 않았습니다. 이메일을 확인해주세요.');
+    
+    // Enable email verification check
+    if (!user.emailVerified) {
+      throw new UnauthorizedException('이메일 인증이 완료되지 않았습니다. 이메일을 확인해주세요.');
+    }
+    
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     const { password: _, ...result } = user;
@@ -46,9 +50,12 @@ export class AuthService {
 
   async register(dto: any) {
     const user = await this.usersService.createUser(dto);
-   // const verificationToken = uuidv4();
-   // await this.usersService.saveVerificationToken(user.id, verificationToken);
-   // await this.emailService.sendVerificationEmail(user.email, verificationToken);
+    
+    // Enable email verification
+    const verificationToken = uuidv4();
+    await this.usersService.saveVerificationToken(user.id, verificationToken);
+    await this.emailService.sendVerificationEmail(user.email, verificationToken);
+    
     return {
       message: '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.',
       email: user.email,

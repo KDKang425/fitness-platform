@@ -4,11 +4,9 @@ import {
   Column,
   ManyToOne,
   CreateDateColumn,
-  OneToMany,
 } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { WorkoutSession } from 'src/workouts/entities/workout-session.entity';
-import { PostComment } from './post-comment.entity';
 
 @Entity('posts')
 export class Post {
@@ -29,9 +27,6 @@ export class Post {
 
   @Column({ default: 0 })
   likesCount: number;
-
-  @OneToMany(() => PostComment, (c) => c.post)
-  comments: PostComment[];
 
   @CreateDateColumn()
   createdAt: Date;

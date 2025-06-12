@@ -5,29 +5,37 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import api from '../utils/api'
 import { AuthStackParamList } from '../navigation/AuthStack'
 import { AuthContext } from '../contexts/AuthContext'
+import { useError } from '../utils/errorHandler'
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>
 
 export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
   const { login } = useContext(AuthContext)
+  const { error, loading, execute } = useError()
 
   const onPressLogin = async () => {
     if (!email || !password) {
       Alert.alert('알림', '이메일과 비밀번호를 모두 입력하세요.')
       return
     }
-    try {
-      setLoading(true)
-      const res = await api.post('/auth/login', { email, password })
-      const { accessToken, refreshToken } = res.data
+    
+    const result = await execute(
+      api.post('/auth/login', { email, password }),
+      { 
+        showAlert: true,
+        onError: (err) => {
+          if (err.statusCode === 401) {
+            Alert.alert('로그인 실패', '이메일 또는 비밀번호가 올바르지 않습니다.')
+          }
+        }
+      }
+    )
+    
+    if (result) {
+      const { accessToken, refreshToken } = result.data
       await login(accessToken, refreshToken)
-    } catch (e: any) {
-      Alert.alert('로그인 실패', e?.response?.data?.message ?? '이메일/비밀번호를 확인해주세요.')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -51,6 +59,10 @@ export default function LoginScreen({ navigation }: Props) {
         value={password}
         onChangeText={setPassword}
       />
+      
+      {error && (
+        <Text style={styles.errorText}>{error.message}</Text>
+      )}
       <TouchableOpacity style={styles.button} onPress={onPressLogin} disabled={loading}>
         {loading ? (
           <ActivityIndicator color="#000" />
@@ -73,4 +85,5 @@ const styles = StyleSheet.create({
   buttonText: { color: '#000', fontSize: 16, fontWeight: 'bold' },
   link: { marginTop: 24 },
   linkText: { color: '#ff7f27', textAlign: 'center' },
+  errorText: { color: '#ff6b6b', fontSize: 14, marginBottom: 12, textAlign: 'center' },
 })

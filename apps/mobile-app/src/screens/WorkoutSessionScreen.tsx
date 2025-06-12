@@ -13,6 +13,8 @@ import WorkoutTimer from '../components/WorkoutTimer'
 import ExerciseSetInput from '../components/ExerciseSetInput'
 import SetRow, { SetRowProps } from '../components/SetRow'
 import EditSetModal from '../components/EditSetModal'
+import { useError } from '../utils/errorHandler'
+import { showToast } from '../utils/Toast'
 
 interface SetType {
   id: number
@@ -45,79 +47,107 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
   const [session, setSession]   = useState<Session | null>(null)
   const [sets, setSets]         = useState<SetType[]>([])
   const [editTarget, setEditTarget] = useState<SetType | null>(null)
+  const { error, loading, execute } = useError()
 
   useEffect(() => {
     ;(async () => {
-      try {
-        const { data } = await api.get<Session>(`/workouts/${sessionId}`)
-        setSession(data)
-        setSets(data.sets ?? [])
-      } catch {
-        Alert.alert('세션 불러오기 실패')
-        navigation.goBack()
+      const result = await execute(
+        api.get<Session>(`/workouts/${sessionId}`),
+        {
+          onError: () => {
+            Alert.alert('오류', '운동 세션을 불러올 수 없습니다.', [
+              { text: '확인', onPress: () => navigation.goBack() }
+            ])
+          }
+        }
+      )
+      
+      if (result) {
+        setSession(result.data)
+        setSets(result.data.sets ?? [])
       }
     })()
-  }, [sessionId, navigation])
+  }, [sessionId, navigation, execute])
 
   const addSet = useCallback(
     async (payload: AddSetPayload) => {
-      try {
-        const { data } = await api.post<SetType>(
-          `/workouts/${sessionId}/sets`,
-          payload,
-        )
-        setSets(prev => [...prev, data])
-      } catch {
-        Alert.alert('추가 실패')
+      const result = await execute(
+        api.post<SetType>(`/workouts/${sessionId}/sets`, payload)
+      )
+      
+      if (result) {
+        setSets(prev => [...prev, result.data])
+        showToast('세트가 추가되었습니다.')
       }
     },
-    [sessionId],
+    [sessionId, execute],
   )
 
   const deleteSet = useCallback(
     async (setId: number) => {
-      try {
-        await api.delete(`/workouts/sets/${setId}`)
+      const result = await execute(
+        api.delete(`/workouts/sets/${setId}`)
+      )
+      
+      if (result) {
         setSets(prev => prev.filter(s => s.id !== setId))
-      } catch {
-        Alert.alert('삭제 실패')
+        showToast('세트가 삭제되었습니다.')
       }
     },
-    [],
+    [execute],
   )
 
   const saveEdit = useCallback(
     async (weight: number, reps: number) => {
       if (!editTarget) return
-      try {
-        await api.patch(`/workouts/sets/${editTarget.id}`, { weight, reps })
+      
+      const result = await execute(
+        api.patch(`/workouts/sets/${editTarget.id}`, { weight, reps })
+      )
+      
+      if (result) {
         setSets(prev =>
           prev.map(s =>
             s.id === editTarget.id ? { ...s, weight, reps } : s,
           ),
         )
-      } catch {
-        Alert.alert('수정 실패')
-      } finally {
-        setEditTarget(null)
+        showToast('세트가 수정되었습니다.')
       }
+      
+      setEditTarget(null)
     },
-    [editTarget],
+    [editTarget, execute],
   )
 
   const finishSession = async () => {
-    try {
-      await api.patch(`/workouts/${sessionId}/finish`)
-      navigation.popToTop()
-    } catch {
-      Alert.alert('종료 실패')
-    }
+    Alert.alert(
+      '운동 종료',
+      '운동을 종료하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '종료',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await execute(
+              api.patch(`/workouts/${sessionId}/finish`),
+              { showAlert: true }
+            )
+            
+            if (result) {
+              showToast('운동이 완료되었습니다!')
+              navigation.popToTop()
+            }
+          }
+        }
+      ]
+    )
   }
 
-  if (!session)
+  if (!session || loading)
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#ff7f27" />
       </View>
     )
 

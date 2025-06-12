@@ -19,7 +19,6 @@ import { Notification } from '../../notification/entities/notification.entity';
 import { UserProgram } from '../../programs/entities/user-program.entity';
 import { FriendRequest } from './friend-request.entity';
 import { RefreshToken } from '../../auth/entities/refresh-token.entity';
-import { PostComment } from '../../posts/entities/post-comment.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -144,7 +143,4 @@ export class User {
 
   @OneToMany(() => RefreshToken, (rt) => rt.user)
   refreshTokens: RefreshToken[];
-
-  @OneToMany(() => PostComment, c => c.author)
-  postComments: PostComment[];
 }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -12,7 +12,7 @@ import { NotificationModule } from '../notification/notification.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Follow, FriendRequest]),
-    NotificationModule,
+    forwardRef(() => NotificationModule),
   ],
   controllers: [UsersController, FriendRequestController],
   providers: [UsersService, FriendRequestService],

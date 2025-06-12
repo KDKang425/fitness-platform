@@ -3,8 +3,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class AddRefreshTokenTable1748770000000 implements MigrationInterface {
   name = 'AddRefreshTokenTable1748770000000';
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Create table if it doesn't exist
     await queryRunner.query(`
-      CREATE TABLE "refresh_tokens" (
+      CREATE TABLE IF NOT EXISTS "refresh_tokens" (
         "id" SERIAL NOT NULL,
         "token" character varying(512) NOT NULL,
         "expires_at" TIMESTAMP NOT NULL,
@@ -14,13 +15,17 @@ export class AddRefreshTokenTable1748770000000 implements MigrationInterface {
         CONSTRAINT "PK_refresh_tokens_id" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`
+    
+    // Add foreign key if it doesn't exist
+    await queryRunner.query(`DO $$ BEGIN
       ALTER TABLE "refresh_tokens"
       ADD CONSTRAINT "FK_refresh_tokens_user"
-      FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE
-    `);
+      FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE;
+    EXCEPTION
+      WHEN duplicate_object THEN null;
+    END $$;`);
   }
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE "refresh_tokens"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "refresh_tokens"`);
   }
 }

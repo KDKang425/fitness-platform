@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { View, TextInput, StyleSheet, Button } from 'react-native'
+import { View, TextInput, StyleSheet, TouchableOpacity } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 
 interface Props {
   exerciseId: number
@@ -27,6 +28,7 @@ export default function ExerciseSetInput({ exerciseId, onAdd }: Props) {
         onChangeText={setWeight}
         keyboardType="numeric"
         style={styles.input}
+        placeholderTextColor="#666"
       />
       <TextInput
         placeholder="횟수"
@@ -34,8 +36,11 @@ export default function ExerciseSetInput({ exerciseId, onAdd }: Props) {
         onChangeText={setReps}
         keyboardType="numeric"
         style={styles.input}
+        placeholderTextColor="#666"
       />
-      <Button title="추가" onPress={handleAdd} />
+      <TouchableOpacity onPress={handleAdd} style={styles.checkButton}>
+        <Ionicons name="checkmark-circle" size={36} color="#ff7f27" />
+      </TouchableOpacity>
     </View>
   )
 }
@@ -50,5 +55,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginHorizontal: 4,
     color: 'white',
+  },
+  checkButton: {
+    marginHorizontal: 4,
   },
 })

@@ -240,30 +240,52 @@ export class StatsService {
     const mainLifts = ['Barbell Bench Press', 'Barbell Squat', 'Deadlift', 'Overhead Press'];
     const threeMonthsAgo = this.addDays(new Date(), -90);
 
+    // Fetch all exercises in a single query
+    const exercises = await this.exerciseRepo
+      .createQueryBuilder('exercise')
+      .where('exercise.name IN (:...names)', { names: mainLifts })
+      .getMany();
+    
+    const exerciseIds = exercises.map(e => e.id);
+    const exerciseMap = new Map(exercises.map(e => [e.id, e.name]));
+
+    // Fetch all workout data in a single query
+    const allData = await this.setRepo
+      .createQueryBuilder('set')
+      .leftJoin('set.workoutSession', 'session')
+      .where('session.user.id = :userId', { userId })
+      .andWhere('set.exercise.id IN (:...exerciseIds)', { exerciseIds })
+      .andWhere('session.startTime >= :from', { from: threeMonthsAgo })
+      .select([
+        'set.exercise.id as exerciseId',
+        'session.date as date',
+        'MAX(set.weight * (1 + set.reps / 30.0)) as estimated1RM',
+      ])
+      .groupBy('set.exercise.id, session.date')
+      .orderBy('session.date', 'ASC')
+      .getRawMany();
+
+    // Group data by exercise
     const trends = {};
+    for (const row of allData) {
+      const exerciseName = exerciseMap.get(Number(row.exerciseId));
+      if (!exerciseName) continue;
+      
+      if (!trends[exerciseName]) {
+        trends[exerciseName] = [];
+      }
+      
+      trends[exerciseName].push({
+        date: row.date,
+        estimated1RM: Math.round(Number(row.estimated1RM)),
+      });
+    }
 
+    // Ensure all lifts are in the result, even if empty
     for (const liftName of mainLifts) {
-      const exercise = await this.exerciseRepo.findOne({ where: { name: liftName } });
-      if (!exercise) continue;
-
-      const data = await this.setRepo
-        .createQueryBuilder('set')
-        .leftJoin('set.workoutSession', 'session')
-        .where('session.user.id = :userId', { userId })
-        .andWhere('set.exercise.id = :exerciseId', { exerciseId: exercise.id })
-        .andWhere('session.startTime >= :from', { from: threeMonthsAgo })
-        .select([
-          'session.date as date',
-          'MAX(set.weight * (1 + set.reps / 30.0)) as estimated1RM',
-        ])
-        .groupBy('session.date')
-        .orderBy('session.date', 'ASC')
-        .getRawMany();
-
-      trends[liftName] = data.map(d => ({
-        date: d.date,
-        estimated1RM: Math.round(Number(d.estimated1RM)),
-      }));
+      if (!trends[liftName]) {
+        trends[liftName] = [];
+      }
     }
 
     return trends;
@@ -442,25 +464,45 @@ export class StatsService {
       overheadPress: 'Overhead Press',
     };
 
+    // Fetch all exercises in a single query
+    const exerciseNames = Object.values(mainLifts);
+    const exercises = await this.exerciseRepo
+      .createQueryBuilder('exercise')
+      .where('exercise.name IN (:...names)', { names: exerciseNames })
+      .getMany();
+    
+    // Create a map for quick lookup
+    const exerciseMap = new Map(exercises.map(e => [e.name, e]));
+
+    // Fetch all PRs for the user in a single query
+    const prs = await this.prRepo
+      .createQueryBuilder('pr')
+      .leftJoinAndSelect('pr.exercise', 'exercise')
+      .where('pr.user.id = :userId', { userId })
+      .andWhere('exercise.name IN (:...names)', { names: exerciseNames })
+      .getMany();
+    
+    // Create a map for quick PR lookup
+    const prMap = new Map(prs.map(pr => [pr.exercise.name, pr]));
+
+    // Fetch user data once
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      select: ['benchPress1RM', 'squat1RM', 'deadlift1RM', 'overheadPress1RM'],
+    });
+
     const result: any = {};
 
     for (const [key, exerciseName] of Object.entries(mainLifts)) {
-      const exercise = await this.exerciseRepo.findOne({
-        where: { name: exerciseName },
-      });
-
+      const exercise = exerciseMap.get(exerciseName);
+      
       if (!exercise) {
         result[key] = null;
         continue;
       }
 
-      const pr = await this.prRepo.findOne({
-        where: { 
-          user: { id: userId },
-          exercise: { id: exercise.id },
-        },
-      });
-
+      const pr = prMap.get(exerciseName);
+      
       if (pr) {
         result[key] = {
           weight: pr.bestWeight,
@@ -468,25 +510,18 @@ export class StatsService {
           estimated1RM: pr.estimated1RM,
           lastUpdated: pr.updatedAt,
         };
-      } else {
-        const user = await this.userRepo.findOne({
-          where: { id: userId },
-          select: ['benchPress1RM', 'squat1RM', 'deadlift1RM', 'overheadPress1RM'],
-        });
-
-        if (user) {
-          const profileValue = user[`${key}1RM`];
-          if (profileValue) {
-            result[key] = {
-              weight: profileValue,
-              reps: 1,
-              estimated1RM: profileValue,
-              lastUpdated: null,
-              isFromProfile: true,
-            };
-          } else {
-            result[key] = null;
-          }
+      } else if (user) {
+        const profileValue = user[`${key}1RM`];
+        if (profileValue) {
+          result[key] = {
+            weight: profileValue,
+            reps: 1,
+            estimated1RM: profileValue,
+            lastUpdated: null,
+            isFromProfile: true,
+          };
+        } else {
+          result[key] = null;
         }
       }
     }

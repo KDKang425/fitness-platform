@@ -32,6 +32,7 @@ import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { BackupModule } from './backup/backup.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 
 @Module({
   imports: [
@@ -56,8 +57,11 @@ import { RealtimeModule } from './realtime/realtime.module';
         logging: process.env.NODE_ENV === 'development',
         namingStrategy: new SnakeNamingStrategy(),
         extra: {
-          max: 10,
+          max: 30, // Increased from 10 for better concurrency
+          min: 5,  // Minimum pool size
           idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 2000, // Connection timeout
+          acquireTimeoutMillis: 30000,   // Max time to wait for connection
         },
       }),
       inject: [ConfigService],
@@ -131,6 +135,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     UserProgramsModule,
     BackupModule,
     RealtimeModule,
+    PushNotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

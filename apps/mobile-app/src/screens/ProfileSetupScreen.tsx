@@ -8,40 +8,108 @@ export default function ProfileSetupScreen({ navigation }: { navigation: any }) 
   const [bench, setBench] = useState('')
   const [squat, setSquat] = useState('')
   const [deadlift, setDeadlift] = useState('')
+  const [ohp, setOhp] = useState('')
+  const [unit, setUnit] = useState<'kg' | 'lbs'>('kg')
+  const [profileImage, setProfileImage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const onSubmit = async () => {
+    setError(null)
+    setLoading(true)
+    
     try {
-      await api.post('/users/profile/initial', {
+      // Validate required fields
+      if (!height || !weight) {
+        setError('키와 몸무게는 필수 입력 사항입니다.')
+        setLoading(false)
+        return
+      }
+      
+      const payload: any = {
         height: Number(height),
-        initial_weight: Number(weight),
-        bench_press_1rm: Number(bench),
-        squat_1rm: Number(squat),
-        deadlift_1rm: Number(deadlift),
+        weight: Number(weight),
+        preferredUnit: unit,
+      }
+      
+      // Add optional 1RM values if provided
+      if (bench) payload.benchPress1RM = Number(bench)
+      if (squat) payload.squat1RM = Number(squat)
+      if (deadlift) payload.deadlift1RM = Number(deadlift)
+      if (ohp) payload.overheadPress1RM = Number(ohp)
+      if (profileImage) payload.profileImageUrl = profileImage
+      
+      await api.post('/users/profile/initial', payload)
+      
+      // Navigate to main app instead of going back
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
       })
-      navigation.goBack()
-    } catch {
+    } catch (error: any) {
+      setError(error.response?.data?.message || '프로필 설정 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>프로필 설정</Text>
+      
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+      
+      <View style={styles.unitContainer}>
+        <TouchableOpacity
+          style={[styles.unitButton, unit === 'kg' && styles.unitButtonActive]}
+          onPress={() => setUnit('kg')}
+        >
+          <Text style={[styles.unitText, unit === 'kg' && styles.unitTextActive]}>kg</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.unitButton, unit === 'lbs' && styles.unitButtonActive]}
+          onPress={() => setUnit('lbs')}
+        >
+          <Text style={[styles.unitText, unit === 'lbs' && styles.unitTextActive]}>lbs</Text>
+        </TouchableOpacity>
+      </View>
+      
       <TextInput style={styles.input} placeholder="키 (cm)" placeholderTextColor="#888" keyboardType="numeric" onChangeText={setHeight} value={height} />
-      <TextInput style={styles.input} placeholder="몸무게 (kg)" placeholderTextColor="#888" keyboardType="numeric" onChangeText={setWeight} value={weight} />
-      <TextInput style={styles.input} placeholder="벤치프레스 1RM" placeholderTextColor="#888" keyboardType="numeric" onChangeText={setBench} value={bench} />
-      <TextInput style={styles.input} placeholder="스쿼트 1RM" placeholderTextColor="#888" keyboardType="numeric" onChangeText={setSquat} value={squat} />
-      <TextInput style={styles.input} placeholder="데드리프트 1RM" placeholderTextColor="#888" keyboardType="numeric" onChangeText={setDeadlift} value={deadlift} />
-      <TouchableOpacity style={styles.button} onPress={onSubmit}>
-        <Text style={styles.buttonText}>저장하고 시작하기</Text>
+      <TextInput style={styles.input} placeholder={`몸무게 (${unit})`} placeholderTextColor="#888" keyboardType="numeric" onChangeText={setWeight} value={weight} />
+      
+      <Text style={styles.sectionTitle}>1RM 기록 (선택사항)</Text>
+      <Text style={styles.helperText}>나중에 언제든지 추가할 수 있습니다</Text>
+      
+      <TextInput style={styles.input} placeholder={`벤치프레스 1RM (${unit})`} placeholderTextColor="#888" keyboardType="numeric" onChangeText={setBench} value={bench} />
+      <TextInput style={styles.input} placeholder={`스쿼트 1RM (${unit})`} placeholderTextColor="#888" keyboardType="numeric" onChangeText={setSquat} value={squat} />
+      <TextInput style={styles.input} placeholder={`데드리프트 1RM (${unit})`} placeholderTextColor="#888" keyboardType="numeric" onChangeText={setDeadlift} value={deadlift} />
+      <TextInput style={styles.input} placeholder={`오버헤드프레스 1RM (${unit})`} placeholderTextColor="#888" keyboardType="numeric" onChangeText={setOhp} value={ohp} />
+      
+      <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={onSubmit} disabled={loading}>
+        <Text style={styles.buttonText}>{loading ? '저장 중...' : '저장하고 시작하기'}</Text>
       </TouchableOpacity>
     </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
-  title: { color: '#ff7f27', fontSize: 32, fontWeight: 'bold', marginBottom: 32 },
+  container: { flexGrow: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingVertical: 20 },
+  title: { color: '#ff7f27', fontSize: 32, fontWeight: 'bold', marginBottom: 24 },
+  sectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 20, marginBottom: 8, alignSelf: 'flex-start', width: '100%' },
+  helperText: { color: '#888', fontSize: 14, marginBottom: 16, alignSelf: 'flex-start', width: '100%' },
   input: { width: '100%', borderWidth: 1, borderColor: '#ff7f27', borderRadius: 4, padding: 12, color: '#fff', marginBottom: 16 },
   button: { width: '100%', backgroundColor: '#ff7f27', padding: 14, borderRadius: 4, alignItems: 'center', marginTop: 8 },
+  buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#000', fontSize: 16, fontWeight: 'bold' },
+  unitContainer: { flexDirection: 'row', marginBottom: 20, gap: 10 },
+  unitButton: { paddingHorizontal: 30, paddingVertical: 10, borderWidth: 1, borderColor: '#ff7f27', borderRadius: 4 },
+  unitButtonActive: { backgroundColor: '#ff7f27' },
+  unitText: { color: '#ff7f27', fontSize: 16, fontWeight: 'bold' },
+  unitTextActive: { color: '#000' },
+  errorContainer: { backgroundColor: '#ff000020', padding: 12, borderRadius: 4, marginBottom: 16, width: '100%' },
+  errorText: { color: '#ff6b6b', textAlign: 'center' },
 })

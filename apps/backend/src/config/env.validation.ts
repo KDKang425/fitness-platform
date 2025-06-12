@@ -29,8 +29,8 @@ export class EnvironmentVariables {
   DB_DATABASE?: string = 'fitness_db';
 
   @IsString()
-  @IsOptional()
-  JWT_SECRET?: string = 'development-jwt-secret';
+  @IsNotEmpty({ message: 'JWT_SECRET is required. Please set it in your environment variables.' })
+  JWT_SECRET!: string; // Required - no default value
 
   @IsOptional()
   @IsString()
@@ -140,14 +140,26 @@ export function validate(config: Record<string, unknown>) {
     enableImplicitConversion: true,
   });
   
-  // 🔧 개발용: 검증 에러 무시 (경고만 출력)
   const errors = validateSync(validatedConfig, {
     skipMissingProperties: false,
   });
 
   if (errors.length > 0) {
-    console.warn('⚠️  환경변수 검증 경고 (개발 모드):', errors.toString());
-    // throw new Error(errors.toString()); // 주석 처리
+    // Always throw error for missing JWT_SECRET
+    const hasJwtSecretError = errors.some(error => 
+      error.property === 'JWT_SECRET' && error.constraints?.isNotEmpty
+    );
+    
+    if (hasJwtSecretError) {
+      throw new Error('CRITICAL: JWT_SECRET must be set in environment variables. Application cannot start without it.');
+    }
+    
+    // For other errors, warn in development but throw in production
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(errors.toString());
+    } else {
+      console.warn('⚠️  환경변수 검증 경고 (개발 모드):', errors.toString());
+    }
   }
   
   return validatedConfig;

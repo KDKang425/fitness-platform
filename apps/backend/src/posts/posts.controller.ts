@@ -33,14 +33,6 @@ export class PostsController {
     return this.postsService.createPost({ ...dto, userId: req.user.userId });
   }
 
-  @ApiOperation({ summary: '포스트 상세 조회' })
-  @ApiResponse({ status: 200, description: '포스트 정보 반환' })
-  @ApiResponse({ status: 404, description: '포스트를 찾을 수 없음' })
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.postsService.findOne(id);
-  }
-
   @ApiOperation({ summary: '포스트 목록 조회' })
   @ApiResponse({ status: 200, description: '포스트 목록 반환' })
   @Get()
@@ -48,8 +40,10 @@ export class PostsController {
     @Query('page', ParseIntPipe) page = 1,
     @Query('limit', ParseIntPipe) limit = 20,
     @Query('sort') sort: 'recent' | 'popular' = 'recent',
+    @Req() req: any,
   ) {
-    return this.postsService.findAll(page, limit, sort);
+    const userId = req.user?.userId;
+    return this.postsService.findAll(page, limit, sort, userId);
   }
 
   @ApiOperation({ summary: '피드 조회' })
@@ -69,6 +63,15 @@ export class PostsController {
       page,
       limit,
     );
+  }
+
+  @ApiOperation({ summary: '포스트 상세 조회' })
+  @ApiResponse({ status: 200, description: '포스트 정보 반환' })
+  @ApiResponse({ status: 404, description: '포스트를 찾을 수 없음' })
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    const userId = req.user?.userId;
+    return this.postsService.findOne(id, userId);
   }
 
   @ApiOperation({ summary: '포스트 좋아요' })
