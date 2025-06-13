@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native'
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Image, Alert } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
+import { Ionicons } from '@expo/vector-icons'
 import api from '../utils/api'
 
 export default function ProfileSetupScreen({ navigation }: { navigation: any }) {
@@ -13,6 +15,25 @@ export default function ProfileSetupScreen({ navigation }: { navigation: any }) 
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const pickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!permissionResult.granted) {
+      Alert.alert('권한 필요', '사진 라이브러리 접근 권한이 필요합니다.')
+      return
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+
+    if (!result.canceled && result.assets[0]) {
+      setProfileImage(result.assets[0].uri)
+    }
+  }
 
   const onSubmit = async () => {
     setError(null)
@@ -56,6 +77,17 @@ export default function ProfileSetupScreen({ navigation }: { navigation: any }) 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>프로필 설정</Text>
+      
+      <TouchableOpacity style={styles.imagePickerContainer} onPress={pickImage}>
+        {profileImage ? (
+          <Image source={{ uri: profileImage }} style={styles.profileImage} />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Ionicons name="camera-outline" size={40} color="#888" />
+            <Text style={styles.imagePlaceholderText}>프로필 사진 추가</Text>
+          </View>
+        )}
+      </TouchableOpacity>
       
       {error && (
         <View style={styles.errorContainer}>
@@ -112,4 +144,8 @@ const styles = StyleSheet.create({
   unitTextActive: { color: '#000' },
   errorContainer: { backgroundColor: '#ff000020', padding: 12, borderRadius: 4, marginBottom: 16, width: '100%' },
   errorText: { color: '#ff6b6b', textAlign: 'center' },
+  imagePickerContainer: { marginBottom: 20, alignItems: 'center' },
+  profileImage: { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#ff7f27' },
+  imagePlaceholder: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#333' },
+  imagePlaceholderText: { color: '#888', marginTop: 8, fontSize: 12 },
 })

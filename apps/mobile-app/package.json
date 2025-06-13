@@ -37,9 +37,10 @@
     "react-native-swipe-list-view": "^3.2.9",
     "victory-native": "^41.17.3",
     "@react-native-community/datetimepicker": "8.3.0",
-    "@react-native-community/netinfo": "11.9.1",
-    "expo-notifications": "~0.29.14",
-    "expo-device": "~6.0.3"
+    "@react-native-community/netinfo": "11.4.1",
+    "expo-notifications": "~0.28.0",
+    "expo-device": "~6.0.0",
+    "expo-image-picker": "~15.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
