@@ -7,12 +7,12 @@ import {
   Unique,
   OneToMany,
 } from 'typeorm';
-import { Routine } from 'src/routines/entities/routine.entity';
-import { WorkoutSession } from 'src/workouts/entities/workout-session.entity';
-import { Post } from 'src/posts/entities/post.entity';
-import { Like } from 'src/posts/entities/like.entity';
-import { Follow } from 'src/users/entities/follow.entity';
-import { BodyRecord } from 'src/body-records/entities/body-record.entity';
+import { Routine } from '../../routines/entities/routine.entity';
+import { WorkoutSession } from '../../workouts/entities/workout-session.entity';
+import { Post } from '../../posts/entities/post.entity';
+import { Like } from '../../posts/entities/like.entity';
+import { Follow } from './follow.entity';
+import { BodyRecord } from '../../body-records/entities/body-record.entity';
 import { RoutineSubscription } from '../../routine-subscriptions/entities/routine-subscription.entity';
 import { PersonalRecord } from '../../personal-records/entities/personal-record.entity';
 import { Notification } from '../../notification/entities/notification.entity';
@@ -41,43 +41,43 @@ export class User {
   @Column({ length: 50 })
   nickname: string;
 
-  @Column({ nullable: true, length: 255 })
+  @Column({ nullable: true, length: 255, name: 'profile_image_url' })
   profileImageUrl?: string;
 
   @Column({ nullable: true })
   height?: number;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'initial_weight' })
   initialWeight?: number;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'bench_press_1rm' })
   benchPress1RM?: number;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'squat_1rm' })
   squat1RM?: number;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'deadlift_1rm' })
   deadlift1RM?: number;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'overhead_press_1rm' })
   overheadPress1RM?: number;
 
-  @Column({ default: false })
+  @Column({ default: false, name: 'has_completed_initial_setup' })
   hasCompletedInitialSetup: boolean;
 
-  @Column({ default: false })
+  @Column({ default: false, name: 'email_verified' })
   emailVerified: boolean;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'email_verification_token' })
   emailVerificationToken?: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'email_verification_expiry' })
   emailVerificationExpiry?: Date;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'password_reset_token' })
   passwordResetToken?: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'password_reset_expiry' })
   passwordResetExpiry?: Date;
 
   @Column({
@@ -87,19 +87,19 @@ export class User {
   })
   role: UserRole;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'fcm_token' })
   fcmToken?: string;
 
-  @Column({ default: true })
+  @Column({ default: true, name: 'notifications_enabled' })
   notificationsEnabled: boolean;
 
-  @Column({ default: 'kg', length: 3 })
+  @Column({ default: 'kg', length: 3, name: 'preferred_unit' })
   preferredUnit?: 'kg' | 'lbs';
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
   @OneToMany(() => Routine, (routine) => routine.creator)

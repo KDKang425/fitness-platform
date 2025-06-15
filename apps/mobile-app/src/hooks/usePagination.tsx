@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native'
 import { showToast } from '../utils/Toast'
 
 interface PaginationOptions {
@@ -99,8 +100,6 @@ export function usePagination<T>(
 }
 
 // List Footer Component
-import React from 'react'
-import { View, ActivityIndicator, Text, StyleSheet } from 'react-native'
 
 interface ListFooterProps {
   loading: boolean

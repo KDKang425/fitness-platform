@@ -259,7 +259,11 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
 
       <ExercisePickerModal
         visible={showExercisePicker}
-        onSelect={handleExerciseSelect}
+        onConfirm={(exercises) => {
+          if (exercises.length > 0) {
+            handleExerciseSelect(exercises[0].id)
+          }
+        }}
         onClose={() => setShowExercisePicker(false)}
       />
     </View>

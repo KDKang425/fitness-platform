@@ -17,8 +17,10 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
       return
     }
     
-    if (password.length < 6) {
-      Alert.alert('알림', '비밀번호는 6자 이상이어야 합니다.')
+    // 비밀번호 유효성 검사 - 백엔드 요구사항과 일치
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+    if (!passwordRegex.test(password)) {
+      Alert.alert('알림', '비밀번호는 8자 이상이며, 대문자, 소문자, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다.')
       return
     }
 
@@ -39,8 +41,8 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
       const loginResponse = await api.post('/auth/login', { email, password })
       console.log('로그인 성공:', loginResponse.data)
       
-      const { accessToken, refreshToken } = loginResponse.data
-      await login(accessToken, refreshToken)
+      const { accessToken, refreshToken, user } = loginResponse.data
+      await login(accessToken, refreshToken, user)
 
       // 프로필 설정으로 이동
       console.log('프로필 설정으로 이동...')

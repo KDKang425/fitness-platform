@@ -3,7 +3,7 @@ import React, { useState, useContext } from 'react'
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import api from '../utils/api'
-import { AuthStackParamList } from '../navigation/AuthStack'
+import { AuthStackParamList } from '../navigation/types'
 import { AuthContext } from '../contexts/AuthContext'
 import { useError } from '../utils/errorHandler'
 

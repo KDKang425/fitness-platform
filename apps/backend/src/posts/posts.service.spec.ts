@@ -252,7 +252,7 @@ describe('PostsService', () => {
     it('should return all posts with isLiked false when no userId', async () => {
       const posts = [{ id: 1, content: 'Post 1' }];
 
-      const result = await service['addIsLikedToPosts'](posts as any[], null);
+      const result = await service['addIsLikedToPosts'](posts as any[], null as any);
 
       expect(result).toEqual([
         { id: 1, content: 'Post 1', isLiked: false },

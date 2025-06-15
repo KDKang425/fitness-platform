@@ -26,19 +26,37 @@ export class EmailService {
       sgMail.setApiKey(sendgridApiKey);
     } else {
       this.usesSendGrid = false;
-      this.transporter = nodemailer.createTransport({
-        host: this.configService.get('SMTP_HOST'),
-        port: this.configService.get('SMTP_PORT'),
-        secure: this.configService.get('SMTP_SECURE', false),
-        auth: {
-          user: this.configService.get('SMTP_USER'),
-          pass: this.configService.get('SMTP_PASS'),
-        },
-      });
+      // Only create transporter if email is configured
+      const emailHost = this.configService.get('EMAIL_HOST');
+      const emailUser = this.configService.get('EMAIL_USER');
+      const emailPass = this.configService.get('EMAIL_PASS');
+      
+      if (emailHost && emailUser && emailPass) {
+        this.transporter = nodemailer.createTransport({
+          host: emailHost,
+          port: this.configService.get('EMAIL_PORT'),
+          secure: this.configService.get('EMAIL_SECURE', false),
+          auth: {
+            user: emailUser,
+            pass: emailPass,
+          },
+        });
+      }
     }
   }
 
   async sendEmail(options: EmailOptions): Promise<void> {
+    // Skip email sending in development unless explicitly configured
+    if (this.configService.get('NODE_ENV') === 'development' && 
+        !this.configService.get('SENDGRID_API_KEY') && 
+        !this.configService.get('EMAIL_HOST')) {
+      console.log('📧 [DEV] Email skipped:', {
+        to: options.to,
+        subject: options.subject,
+      });
+      return;
+    }
+    
     if (this.usesSendGrid) {
       const msg = {
         to: options.to,

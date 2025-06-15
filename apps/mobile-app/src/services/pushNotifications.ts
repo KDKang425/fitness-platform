@@ -13,6 +13,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -183,7 +185,7 @@ export class PushNotificationService {
         hour: time.getHours(),
         minute: time.getMinutes(),
         repeats: true,
-      },
+      } as any,
     });
   }
 

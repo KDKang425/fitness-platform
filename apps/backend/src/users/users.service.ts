@@ -114,6 +114,14 @@ export class UsersService {
     return user;
   }
 
+  async markEmailAsVerified(userId: number) {
+    await this.userRepo.update(userId, {
+      emailVerified: true,
+      emailVerificationToken: undefined,
+      emailVerificationExpiry: undefined,
+    });
+  }
+
   async savePasswordResetToken(userId: number, token: string) {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + 1);

@@ -13,7 +13,7 @@ interface MuscleVisualizationProps {
   showFront?: boolean
 }
 
-const MUSCLE_GROUPS = {
+const MUSCLE_GROUPS: Record<string, { front: boolean; path?: string; paths?: any[]; label: string }> = {
   CHEST: { 
     front: true,
     path: 'M 35 30 Q 50 25 65 30 L 65 45 Q 50 50 35 45 Z',

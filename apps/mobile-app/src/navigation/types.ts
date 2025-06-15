@@ -1,5 +1,2 @@
-// navigation/types.ts
-export type RecordStackParamList = {
-  RecordMain: undefined
-  WorkoutDetail: { id: number }
-}
+// Re-export all navigation types from the main types file
+export * from '../types/navigation'

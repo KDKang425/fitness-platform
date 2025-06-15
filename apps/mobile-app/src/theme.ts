@@ -2,6 +2,7 @@ export const colors = {
   bg: '#000',
   card: '#111',
   text: '#fff',
+  primary: '#ff7f27',
   accent: '#ff7f27',
   border: '#333',
 }

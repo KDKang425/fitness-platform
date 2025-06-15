@@ -7,21 +7,23 @@ export class CreateWorkoutSetDto {
   @Expose({ name: 'session_id' })
   sessionId?: number;
 
+  @Expose()
   @IsInt()
-  @Expose({ name: 'exercise_id' })
   exerciseId: number;
 
+  @Expose()
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Expose({ name: 'set_number' })
   setNumber?: number;
 
+  @Expose()
   @IsInt()
   @Min(1)
   reps: number;
 
   /** kg */
+  @Expose()
   @IsPositive()
   weight: number;
 }

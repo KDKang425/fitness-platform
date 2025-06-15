@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { EmailService } from '../email/email.service';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +12,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
     private readonly emailService: EmailService,
     private readonly refreshSvc: RefreshTokensService,
   ) {}
@@ -51,6 +53,15 @@ export class AuthService {
 
   async register(dto: any) {
     const user = await this.usersService.createUser(dto);
+    
+    // Skip email verification in development
+    if (this.configService.get('NODE_ENV') === 'development') {
+      await this.usersService.markEmailAsVerified(user.id);
+      return {
+        message: '회원가입이 완료되었습니다.',
+        email: user.email,
+      };
+    }
     
     // Enable email verification
     const verificationToken = uuidv4();

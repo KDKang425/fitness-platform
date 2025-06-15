@@ -528,7 +528,7 @@ export class PostsService {
     };
   }
 
-  async getFeedForUser(userId: number, onlyFollowing = false, page = 1, limit = 20) {
+  async getFeedForUser(userId: number, onlyFollowing = false, page = 1, limit = 20, sort: 'recent' | 'popular' = 'recent') {
     if (onlyFollowing) {
       const query = this.postRepo.createQueryBuilder('post')
         .leftJoinAndSelect('post.user', 'user')
@@ -545,8 +545,20 @@ export class PostsService {
         ]);
 
       const skip = (page - 1) * limit;
+      
+      // Apply sorting based on sort parameter
+      if (sort === 'popular') {
+        // For popular, show posts from last week ordered by likes
+        query.where('post.createdAt >= :date', { 
+          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
+        });
+        query.orderBy('post.likesCount', 'DESC');
+      } else {
+        // Default to recent
+        query.orderBy('post.createdAt', 'DESC');
+      }
+      
       const [posts, total] = await query
-        .orderBy('post.createdAt', 'DESC')
         .skip(skip)
         .take(limit)
         .getManyAndCount();
@@ -563,12 +575,24 @@ export class PostsService {
         },
       };
     } else {
-      const result = await this.getPersonalizedFeed(userId, page, limit);
-      const postsWithLikes = await this.addIsLikedToPosts(result.posts, userId);
-      return {
-        ...result,
-        posts: postsWithLikes,
-      };
+      // For all posts feed
+      if (sort === 'popular') {
+        // Use engagement-based algorithm for popular posts
+        const result = await this.getPersonalizedFeed(userId, page, limit, 'engagement');
+        const postsWithLikes = await this.addIsLikedToPosts(result.posts, userId);
+        return {
+          ...result,
+          posts: postsWithLikes,
+        };
+      } else {
+        // Use default algorithm for recent posts
+        const result = await this.getPersonalizedFeed(userId, page, limit);
+        const postsWithLikes = await this.addIsLikedToPosts(result.posts, userId);
+        return {
+          ...result,
+          posts: postsWithLikes,
+        };
+      }
     }
   }
   async update(userId: number, postId: number, dto: UpdatePostDto) {

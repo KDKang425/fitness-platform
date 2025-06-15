@@ -56,12 +56,14 @@ export class PostsController {
     @Query('page', ParseIntPipe) page = 1,
     @Query('limit', ParseIntPipe) limit = 20,
     @Query('filter') filter: 'all' | 'following' = 'all',
+    @Query('sort') sort: 'recent' | 'popular' = 'recent',
   ) {
     return this.postsService.getFeedForUser(
       req.user.userId,
       filter === 'following',
       page,
       limit,
+      sort,
     );
   }
 
