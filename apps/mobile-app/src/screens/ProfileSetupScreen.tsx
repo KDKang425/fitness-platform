@@ -1,10 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Image, Alert } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../utils/api'
+import { AuthContext } from '../contexts/AuthContext'
 
 export default function ProfileSetupScreen({ navigation }: { navigation: any }) {
+  const { user, login, accessToken, refreshToken } = useContext(AuthContext)
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
   const [bench, setBench] = useState('')
@@ -62,11 +64,11 @@ export default function ProfileSetupScreen({ navigation }: { navigation: any }) 
       
       await api.post('/users/profile/initial', payload)
       
-      // Navigate to main app instead of going back
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Main' }],
-      })
+      // Update user data with completed setup flag
+      if (user && accessToken && refreshToken) {
+        const updatedUser = { ...user, hasCompletedInitialSetup: true }
+        await login(accessToken, refreshToken, updatedUser)
+      }
     } catch (error: any) {
       setError(error.response?.data?.message || '프로필 설정 중 오류가 발생했습니다.')
     } finally {

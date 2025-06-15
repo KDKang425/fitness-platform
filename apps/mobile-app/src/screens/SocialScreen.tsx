@@ -104,7 +104,7 @@ export default function SocialScreen({ navigation }: SocialScreenProps) {
           onPress={() => setSort('popular')}
         >
           <Text style={[styles.sortText, sort === 'popular' && styles.sortTextActive]}>
-            인기순
+            인기순 (주간)
           </Text>
         </TouchableOpacity>
       </View>

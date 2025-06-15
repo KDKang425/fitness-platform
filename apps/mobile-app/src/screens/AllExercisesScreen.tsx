@@ -22,11 +22,27 @@ export default function AllExercisesScreen({ navigation }: Props) {
   const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | 'ALL'>('ALL')
+  const [selectedType, setSelectedType] = useState<ExerciseType | 'ALL'>('ALL')
 
   const muscles: (MuscleGroup | 'ALL')[] = [
     'ALL', 'CHEST', 'BACK', 'SHOULDER', 'TRICEPS', 'BICEPS',
     'FOREARM', 'ABS', 'GLUTES', 'HAMSTRING', 'QUADRICEPS', 'TRAPS', 'CALVES'
   ]
+
+  const exerciseTypes: (ExerciseType | 'ALL')[] = [
+    'ALL', 'BARBELL', 'DUMBBELL', 'BODYWEIGHT', 'MACHINE', 'CABLE', 'SMITH_MACHINE', 'CARDIO'
+  ]
+
+  const typeLabels: { [key: string]: string } = {
+    'ALL': '전체',
+    'BARBELL': '바벨',
+    'DUMBBELL': '덤벨',
+    'BODYWEIGHT': '맨몸',
+    'MACHINE': '머신',
+    'CABLE': '케이블',
+    'SMITH_MACHINE': '스미스머신',
+    'CARDIO': '유산소'
+  }
 
   useEffect(() => {
     fetchExercises()
@@ -34,7 +50,7 @@ export default function AllExercisesScreen({ navigation }: Props) {
 
   useEffect(() => {
     filterExercises()
-  }, [exercises, searchQuery, selectedMuscle])
+  }, [exercises, searchQuery, selectedMuscle, selectedType])
 
   const fetchExercises = async () => {
     try {
@@ -57,6 +73,11 @@ export default function AllExercisesScreen({ navigation }: Props) {
       filtered = filtered.filter(exercise => exercise.muscle === selectedMuscle)
     }
 
+    // 운동 타입 필터
+    if (selectedType !== 'ALL') {
+      filtered = filtered.filter(exercise => exercise.category === selectedType)
+    }
+
     // 검색어 필터
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
@@ -74,9 +95,14 @@ export default function AllExercisesScreen({ navigation }: Props) {
       style={styles.exerciseItem}
       onPress={() => navigation.navigate('ExerciseDetail', { exerciseId: item.id })}
     >
-      <View>
-        <Text style={styles.exerciseName}>{item.name}</Text>
-        <Text style={styles.exerciseInfo}>{item.category} • {item.muscle}</Text>
+      <View style={styles.exerciseContent}>
+        <View>
+          <Text style={styles.exerciseName}>{item.name}</Text>
+          <Text style={styles.exerciseInfo}>{item.muscle}</Text>
+        </View>
+        <View style={styles.exerciseTypeTag}>
+          <Text style={styles.exerciseTypeText}>{typeLabels[item.category] || item.category}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   )
@@ -94,6 +120,23 @@ export default function AllExercisesScreen({ navigation }: Props) {
         selectedMuscle === item && styles.filterChipTextActive
       ]}>
         {item === 'ALL' ? '전체' : item}
+      </Text>
+    </TouchableOpacity>
+  )
+
+  const renderTypeFilter = ({ item }: { item: ExerciseType | 'ALL' }) => (
+    <TouchableOpacity
+      style={[
+        styles.filterChip,
+        selectedType === item && styles.filterChipActive
+      ]}
+      onPress={() => setSelectedType(item)}
+    >
+      <Text style={[
+        styles.filterChipText,
+        selectedType === item && styles.filterChipTextActive
+      ]}>
+        {typeLabels[item]}
       </Text>
     </TouchableOpacity>
   )
@@ -117,7 +160,19 @@ export default function AllExercisesScreen({ navigation }: Props) {
         onChangeText={setSearchQuery}
       />
 
+      {/* 운동 타입 필터 */}
+      <Text style={styles.filterTitle}>운동 타입</Text>
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={exerciseTypes}
+        keyExtractor={(item) => item}
+        renderItem={renderTypeFilter}
+        contentContainerStyle={styles.filterContainer}
+      />
+
       {/* 근육군 필터 */}
+      <Text style={styles.filterTitle}>근육군</Text>
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -192,6 +247,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
+  exerciseContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   exerciseName: {
     color: '#fff',
     fontSize: 16,
@@ -201,6 +261,24 @@ const styles = StyleSheet.create({
   exerciseInfo: {
     color: '#ccc',
     fontSize: 14,
+  },
+  exerciseTypeTag: {
+    backgroundColor: '#ff7f27',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  exerciseTypeText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  filterTitle: {
+    color: '#ff7f27',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 16,
+    marginBottom: 8,
   },
   emptyText: {
     color: '#666',

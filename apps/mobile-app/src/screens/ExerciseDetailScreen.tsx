@@ -98,9 +98,7 @@ export default function ExerciseDetailScreen({ route }: Props) {
       </View>
 
       {/* 1RM 정보 (주요 바벨 운동) */}
-      {oneRM && ['벤치프레스', '스쿼트', '데드리프트', '오버헤드프레스'].some(name => 
-        exercise.name.includes(name)
-      ) && (
+      {oneRM && exercise.type === 'BARBELL' && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>추정 1RM</Text>
           <Text style={styles.oneRM}>{oneRM} kg</Text>

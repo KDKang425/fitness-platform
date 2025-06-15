@@ -13,21 +13,33 @@ import WorkoutTimer from '../components/WorkoutTimer'
 import ExerciseSetInput from '../components/ExerciseSetInput'
 import SetRow, { SetRowProps } from '../components/SetRow'
 import EditSetModal from '../components/EditSetModal'
+import ExercisePickerModal from '../components/ExercisePickerModal'
 import { useError } from '../utils/errorHandler'
 import { showToast } from '../utils/Toast'
+import { TouchableOpacity, Text, FlatList } from 'react-native'
+import Ionicons from '@expo/vector-icons/Ionicons'
 
 interface SetType {
   id: number
-  exerciseId: number
   weight: number
   reps: number
+  exercise: {
+    id: number
+    name: string
+  }
 }
 
 interface Session {
   id: number
   startedAt: string
-  paused: boolean
-  defaultExerciseId: number
+  endTime?: string | null
+  paused?: boolean
+  workoutSets: SetType[]
+}
+
+interface ExerciseGroup {
+  exerciseId: number
+  exerciseName: string
   sets: SetType[]
 }
 
@@ -47,12 +59,14 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
   const [session, setSession]   = useState<Session | null>(null)
   const [sets, setSets]         = useState<SetType[]>([])
   const [editTarget, setEditTarget] = useState<SetType | null>(null)
+  const [showExercisePicker, setShowExercisePicker] = useState(false)
+  const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
   const { error, loading, execute } = useError()
 
   useEffect(() => {
     ;(async () => {
       const result = await execute(
-        api.get<Session>(`/workouts/${sessionId}`),
+        api.get(`/workouts/${sessionId}`),
         {
           onError: () => {
             Alert.alert('오류', '운동 세션을 불러올 수 없습니다.', [
@@ -63,8 +77,9 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
       )
       
       if (result) {
-        setSession(result.data)
-        setSets(result.data.sets ?? [])
+        const sessionData = result.data.data || result.data
+        setSession(sessionData)
+        setSets(sessionData.workoutSets ?? [])
       }
     })()
   }, [sessionId, navigation, execute])
@@ -72,11 +87,12 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
   const addSet = useCallback(
     async (payload: AddSetPayload) => {
       const result = await execute(
-        api.post<SetType>(`/workouts/${sessionId}/sets`, payload)
+        api.post(`/workouts/${sessionId}/sets`, payload)
       )
       
       if (result) {
-        setSets(prev => [...prev, result.data])
+        const newSet = result.data.data || result.data
+        setSets(prev => [...prev, newSet])
         showToast('세트가 추가되었습니다.')
       }
     },
@@ -151,36 +167,87 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
       </View>
     )
 
+  // Group sets by exercise
+  const exerciseGroups = React.useMemo(() => {
+    const groups: { [key: number]: ExerciseGroup } = {}
+    sets.forEach(set => {
+      const exerciseId = set.exercise.id
+      if (!groups[exerciseId]) {
+        groups[exerciseId] = {
+          exerciseId: exerciseId,
+          exerciseName: set.exercise.name,
+          sets: []
+        }
+      }
+      groups[exerciseId].sets.push(set)
+    })
+    return Object.values(groups)
+  }, [sets])
+
+  const handleExerciseSelect = (exerciseId: number) => {
+    setSelectedExerciseId(exerciseId)
+    setShowExercisePicker(false)
+  }
+
   return (
     <View style={styles.container}>
       <WorkoutTimer
         startedAt={Date.parse(session.startedAt)}
-        paused={session.paused}
+        paused={session.paused || false}
       />
 
-      <ExerciseSetInput exerciseId={session.defaultExerciseId} onAdd={addSet} />
+      <TouchableOpacity
+        style={styles.addExerciseButton}
+        onPress={() => setShowExercisePicker(true)}
+      >
+        <Ionicons name="add-circle-outline" size={24} color="#ff7f27" />
+        <Text style={styles.addExerciseText}>운동 추가</Text>
+      </TouchableOpacity>
 
-      <SwipeListView
-        data={sets}
-        keyExtractor={item => String(item.id)}
-        renderItem={({ item, index }) => (
-          <SetRow
-            index={index + 1}
-            weight={item.weight}
-            reps={item.reps}
-            onLongPress={() => setEditTarget(item)}
-          />
-        )}
-        renderHiddenItem={({ item }) => (
-          <View style={styles.hidden}>
-            <Button title="삭제" onPress={() => deleteSet(item.id)} />
+      {selectedExerciseId && (
+        <ExerciseSetInput 
+          exerciseId={selectedExerciseId} 
+          onAdd={addSet} 
+        />
+      )}
+
+      <FlatList
+        data={exerciseGroups}
+        keyExtractor={item => String(item.exerciseId)}
+        renderItem={({ item: group }) => (
+          <View style={styles.exerciseGroup}>
+            <Text style={styles.exerciseName}>{group.exerciseName}</Text>
+            {group.sets.map((set, index) => (
+              <TouchableOpacity
+                key={set.id}
+                onLongPress={() => setEditTarget(set)}
+              >
+                <SetRow
+                  index={index + 1}
+                  weight={set.weight}
+                  reps={set.reps}
+                  onLongPress={() => setEditTarget(set)}
+                />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.addSetButton}
+              onPress={() => {
+                setSelectedExerciseId(group.exerciseId)
+              }}
+            >
+              <Text style={styles.addSetText}>+ 세트 추가</Text>
+            </TouchableOpacity>
           </View>
         )}
-        rightOpenValue={-80}
-        disableRightSwipe
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>운동을 추가하여 시작하세요</Text>
+        }
       />
 
-      <Button title="세션 종료" onPress={finishSession} />
+      <TouchableOpacity style={styles.finishButton} onPress={finishSession}>
+        <Text style={styles.finishButtonText}>세션 종료</Text>
+      </TouchableOpacity>
 
       <EditSetModal
         visible={!!editTarget}
@@ -188,6 +255,12 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
         reps0={editTarget?.reps ?? 0}
         onSave={saveEdit}
         onCancel={() => setEditTarget(null)}
+      />
+
+      <ExercisePickerModal
+        visible={showExercisePicker}
+        onSelect={handleExerciseSelect}
+        onClose={() => setShowExercisePicker(false)}
       />
     </View>
   )
@@ -202,5 +275,60 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingRight: 16,
     backgroundColor: 'red',
+  },
+  addExerciseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#111',
+    margin: 16,
+    borderRadius: 8,
+  },
+  addExerciseText: {
+    color: '#ff7f27',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  exerciseGroup: {
+    backgroundColor: '#111',
+    margin: 16,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 8,
+  },
+  exerciseName: {
+    color: '#ff7f27',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  addSetButton: {
+    padding: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addSetText: {
+    color: '#ff7f27',
+    fontSize: 14,
+  },
+  emptyText: {
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 16,
+  },
+  finishButton: {
+    backgroundColor: '#ff7f27',
+    padding: 16,
+    margin: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  finishButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 })

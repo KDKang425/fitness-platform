@@ -81,11 +81,11 @@ async function bootstrap() {
   app.use('/api/v1/auth/register', authLimiter);
   app.use('/api/v1/auth/request-password-reset', passwordResetLimiter);
   app.use('/api/v1/auth/reset-password', passwordResetLimiter);
-  app.use('/api/v1/workouts*', workoutLimiter);
-  app.use('/api/v1/upload*', uploadLimiter);
-  app.use('/api/v1/*/search', searchLimiter);
+  app.use('/api/v1/workouts', workoutLimiter);
+  app.use('/api/v1/upload', uploadLimiter);
+  app.use('/api/v1/search', searchLimiter);
   app.use('/api/v1/users/search', searchLimiter);
-  app.use('/api/v1/routines?*', searchLimiter);
+  app.use('/api/v1/routines', searchLimiter);
   app.use(generalLimiter);
   
   app.useGlobalFilters(new HttpExceptionFilter());

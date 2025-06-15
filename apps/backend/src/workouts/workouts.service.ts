@@ -243,7 +243,11 @@ export class WorkoutsService {
         dto.reps,
       );
 
-      return savedSet;
+      // Return the set with exercise information
+      return await manager.findOne(WorkoutSet, {
+        where: { id: savedSet.id },
+        relations: ['exercise'],
+      });
     });
   }
 

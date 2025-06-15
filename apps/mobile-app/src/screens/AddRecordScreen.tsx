@@ -13,6 +13,7 @@ import DateTimePicker, {
 import ExercisePickerModal from '../components/ExercisePickerModal'
 import ExerciseSetInput from '../components/ExerciseSetInput'
 import api from '../utils/api'
+import { showToast } from '../utils/Toast'
 
 interface Exercise {
   id: number
@@ -35,6 +36,7 @@ export default function AddRecordScreen({ navigation }: Props) {
   const [picker, setPicker] = useState(false)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [setsByEx, setSetsByEx] = useState<Record<number, SetPayload[]>>({})
+  const [showExercisePicker, setShowExercisePicker] = useState(false)
 
   const addSet = (p: SetPayload) => {
     setSetsByEx((prev) => ({
@@ -44,13 +46,35 @@ export default function AddRecordScreen({ navigation }: Props) {
   }
 
   const save = async () => {
-    const sets = Object.values(setsByEx).flat()
-    if (!sets.length) return
-    await api.post('/workouts/manual', {
-      performedAt: date.toISOString().slice(0, 10),
-      sets,
-    })
-    navigation.goBack()
+    const allSets = Object.values(setsByEx).flat()
+    if (!allSets.length) {
+      showToast('운동 세트를 추가해주세요.')
+      return
+    }
+    
+    try {
+      const exercises = Object.entries(setsByEx).map(([exerciseId, sets]) => ({
+        exerciseId: Number(exerciseId),
+        sets: sets.map((set, index) => ({
+          setNumber: index + 1,
+          reps: set.reps,
+          weight: set.weight,
+        })),
+      }))
+      
+      await api.post('/workouts/manual', {
+        date: date.toISOString().slice(0, 10),
+        startTime: '09:00',  // Default times for manual entry
+        endTime: '10:00',
+        duration: 3600,
+        exercises,
+      })
+      
+      showToast('운동 기록이 저장되었습니다.')
+      navigation.goBack()
+    } catch (error) {
+      showToast('저장에 실패했습니다.')
+    }
   }
 
   return (
@@ -67,11 +91,14 @@ export default function AddRecordScreen({ navigation }: Props) {
           }}
         />
       )}
-      <Button title="운동 추가" onPress={() => setExercises([])} />
+      <Button title="운동 추가" onPress={() => setShowExercisePicker(true)} />
       <ExercisePickerModal
-        visible={!exercises.length}
-        onClose={() => {}}
-        onConfirm={(sel) => setExercises(sel as Exercise[])}
+        visible={showExercisePicker}
+        onClose={() => setShowExercisePicker(false)}
+        onConfirm={(sel) => {
+          setExercises(sel as Exercise[])
+          setShowExercisePicker(false)
+        }}
       />
       <FlatList
         data={exercises}
@@ -96,6 +123,6 @@ export default function AddRecordScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000', padding: 16 },
   card: { backgroundColor: '#111', borderRadius: 8, padding: 12, marginVertical: 8 },
-  exercise: { color: '#ff7f27', fontSize: 16, marginBottom: 4 },
-  set: { color: '#ccc', fontSize: 14 },
+  exercise: { color: '#ff7f27', fontSize: 18, fontWeight: '600', marginBottom: 8 },
+  set: { color: '#ccc', fontSize: 14, marginVertical: 2 },
 })

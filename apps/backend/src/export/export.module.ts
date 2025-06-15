@@ -18,5 +18,6 @@ import { PersonalRecord } from '../personal-records/entities/personal-record.ent
   ],
   controllers: [ExportController],
   providers: [ExportService],
+  exports: [ExportService],
 })
 export class ExportModule {}

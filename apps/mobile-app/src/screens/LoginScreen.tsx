@@ -34,8 +34,8 @@ export default function LoginScreen({ navigation }: Props) {
     )
     
     if (result) {
-      const { accessToken, refreshToken } = result.data
-      await login(accessToken, refreshToken)
+      const { accessToken, refreshToken, user } = result.data
+      await login(accessToken, refreshToken, user)
     }
   }
 

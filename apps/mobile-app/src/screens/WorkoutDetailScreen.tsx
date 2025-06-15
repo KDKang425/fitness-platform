@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { View, Text, FlatList, StyleSheet } from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { RecordStackParamList } from '../navigation/types'  
+import { RecordStackParamList } from '../navigation/RecordStack'  
 import api from '../utils/api'
 import { colors, spacing } from '../theme'                 
 
@@ -16,9 +16,12 @@ interface WorkoutSet {
 
 interface WorkoutDetail {
   id: number
-  performedAt: string
-  duration: number
-  sets: WorkoutSet[]
+  date: string
+  startTime?: Date | null
+  endTime?: Date | null
+  totalTime?: number | null
+  totalVolume: number
+  workoutSets: WorkoutSet[]
 }
 
 export default function WorkoutDetailScreen({ route }: Props) {
@@ -27,8 +30,9 @@ export default function WorkoutDetailScreen({ route }: Props) {
 
   useEffect(() => {
     ;(async () => {
-      const { data } = await api.get<WorkoutDetail>(`/workouts/${id}`)
-      setData(data)
+      const response = await api.get(`/workouts/${id}`)
+      // Backend wraps response in { success, data, ... } structure
+      setData(response.data.data)
     })()
   }, [id])
 
@@ -37,20 +41,21 @@ export default function WorkoutDetailScreen({ route }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>
-        {new Date(data.performedAt).toLocaleDateString()}
+        {new Date(data.date).toLocaleDateString()}
       </Text>
       <Text style={styles.sub}>
-        {(data.duration / 60).toFixed(1)} 분 / 세트 {data.sets.length}
+        {data.totalTime ? `${Math.floor(data.totalTime / 60)}분` : '시간 정보 없음'} / 세트 {data.workoutSets.length}
       </Text>
+      <Text style={styles.volume}>총 볼륨: {data.totalVolume.toLocaleString()} kg</Text>
 
       <FlatList
-        data={data.sets}
+        data={data.workoutSets}
         keyExtractor={(s) => String(s.id)}
         renderItem={({ item }) => (
-          <Text style={styles.row}>
-            {item.exercise.name}{'  '}
-            {item.weight} kg × {item.reps}
-          </Text>
+          <View style={styles.row}>
+            <Text style={styles.exerciseName}>{item.exercise.name}</Text>
+            <Text style={styles.setInfo}>{item.weight} kg × {item.reps}</Text>
+          </View>
         )}
       />
     </View>
@@ -61,5 +66,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   title: { color: colors.text, fontSize: 20, fontWeight: '700' },
   sub: { color: '#aaa', marginBottom: spacing.sm },
-  row: { color: colors.text, paddingVertical: spacing.xs },
+  volume: { color: colors.primary, fontSize: 16, fontWeight: '600', marginBottom: spacing.md },
+  row: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333'
+  },
+  exerciseName: { color: colors.text, fontSize: 16 },
+  setInfo: { color: colors.primary, fontSize: 16, fontWeight: '600' },
 })

@@ -19,8 +19,9 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email);
     if (!user) throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     
-    // Enable email verification check
-    if (!user.emailVerified) {
+    // Enable email verification check (skip in development mode)
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === undefined;
+    if (!isDevelopment && !user.emailVerified) {
       throw new UnauthorizedException('이메일 인증이 완료되지 않았습니다. 이메일을 확인해주세요.');
     }
     

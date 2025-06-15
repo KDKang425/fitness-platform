@@ -15,6 +15,8 @@ interface Exercise {
   id: number
   name: string
   category: string
+  muscle?: string
+  type?: string
 }
 
 interface Props {
@@ -92,7 +94,7 @@ export default function ExercisePickerModal({
               </Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.cat}>{item.category}</Text>
+                <Text style={styles.cat}>{item.muscle || item.category} • {item.type}</Text>
               </View>
             </TouchableOpacity>
           )}

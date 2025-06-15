@@ -8,7 +8,7 @@ import MainTabs from './src/navigation/MainTabs'
 import { pushNotifications } from './src/services/pushNotifications'
 
 function RootNavigator() {
-  const { isLoading, isLoggedIn } = React.useContext(AuthContext)
+  const { isLoading, isLoggedIn, user } = React.useContext(AuthContext)
   
   useEffect(() => {
     if (isLoggedIn) {
@@ -29,6 +29,12 @@ function RootNavigator() {
       </View>
     )
   }
+  
+  // If logged in but hasn't completed initial setup, show ProfileSetup
+  if (isLoggedIn && user && !user.hasCompletedInitialSetup) {
+    return <AuthStack initialRouteName="ProfileSetup" />
+  }
+  
   return isLoggedIn ? <MainTabs /> : <AuthStack />
 }
 

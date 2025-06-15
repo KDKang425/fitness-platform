@@ -18,14 +18,22 @@ export class NotificationService {
     private userRepo: Repository<User>,
     private configService: ConfigService,
   ) {
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: this.configService.get('FIREBASE_PROJECT_ID'),
-          clientEmail: this.configService.get('FIREBASE_CLIENT_EMAIL'),
-          privateKey: this.configService.get('FIREBASE_PRIVATE_KEY')?.replace(/\\n/g, '\n'),
-        }),
-      });
+    const projectId = this.configService.get('FIREBASE_PROJECT_ID');
+    const clientEmail = this.configService.get('FIREBASE_CLIENT_EMAIL');
+    const privateKey = this.configService.get('FIREBASE_PRIVATE_KEY');
+
+    if (projectId && clientEmail && privateKey && !admin.apps.length) {
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            clientEmail,
+            privateKey: privateKey.replace(/\\n/g, '\n'),
+          }),
+        });
+      } catch (error) {
+        console.warn('Firebase initialization failed:', error);
+      }
     }
   }
 

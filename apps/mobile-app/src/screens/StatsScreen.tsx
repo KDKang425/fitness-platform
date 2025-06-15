@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native'
 import api from '../utils/api'
 import VolumeChart from '../components/VolumeChart'
+import MuscleVisualization from '../components/MuscleVisualization'
 
 type StatRes = { label: string; value: number }[]
 
@@ -10,6 +11,7 @@ export default function StatsScreen() {
   const [loading, setLoading] = useState(true)
   const [current, setCurrent] = useState<StatRes>([])
   const [previous, setPrevious] = useState<StatRes>([])
+  const [showFront, setShowFront] = useState(true)
 
   const fetchStats = async () => {
     setLoading(true)
@@ -18,6 +20,24 @@ export default function StatsScreen() {
       const { data } = await api.get(`/stats/${apiPath}`)
       
       // Transform backend response to expected format
+      // Map muscle groups to match visualization component
+      const muscleGroupMap: { [key: string]: string } = {
+        '가슴': 'CHEST',
+        '등': 'BACK',
+        '어깨': 'SHOULDER',
+        '삼두': 'TRICEPS',
+        '이두': 'BICEPS',
+        '전완': 'FOREARM',
+        '복근': 'ABS',
+        '둔근': 'GLUTES',
+        '햄스트링': 'HAMSTRING',
+        '대퇴사두': 'QUADRICEPS',
+        '승모근': 'TRAPS',
+        '종아리': 'CALVES',
+        '다리': 'QUADRICEPS', // fallback for generic "legs"
+        '팔': 'BICEPS', // fallback for generic "arms"
+      }
+      
       const transformed: StatRes = [
         { label: '총볼륨', value: data.totalVolume },
         ...data.perMuscleGroup.map((mg: any) => ({
@@ -69,8 +89,35 @@ export default function StatsScreen() {
   const diffPct = totalPrev ? Math.round((diff / totalPrev) * 100) : 0
   const diffColor = diff >= 0 ? '#ff7f27' : '#ff3b30'
 
+  // Calculate muscle percentages for visualization
+  const muscleGroupMap: { [key: string]: string } = {
+    '가슴': 'CHEST',
+    '등': 'BACK',
+    '어깨': 'SHOULDER',
+    '삼두': 'TRICEPS',
+    '이두': 'BICEPS',
+    '전완': 'FOREARM',
+    '복근': 'ABS',
+    '둔근': 'GLUTES',
+    '햄스트링': 'HAMSTRING',
+    '대퇴사두': 'QUADRICEPS',
+    '승모근': 'TRAPS',
+    '종아리': 'CALVES',
+    '다리': 'QUADRICEPS',
+    '팔': 'BICEPS',
+  }
+  
+  const muscleData = current.slice(1).map(item => {
+    const totalMuscleVolume = current.slice(1).reduce((sum, m) => sum + m.value, 0)
+    return {
+      muscle: muscleGroupMap[item.label] || item.label.toUpperCase(),
+      volume: item.value,
+      percentage: totalMuscleVolume > 0 ? Math.round((item.value / totalMuscleVolume) * 100) : 0
+    }
+  })
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.toggleRow}>
         <TouchableOpacity style={[styles.toggleBtn, mode === 'week' && styles.toggleActive]} onPress={() => setMode('week')}>
           <Text style={styles.toggleText}>주간</Text>
@@ -91,7 +138,24 @@ export default function StatsScreen() {
         current={current.slice(1).map(d => d.value)}
         previous={previous.slice(1).map(d => d.value)}
       />
-    </View>
+
+      <Text style={styles.sectionTitle}>근육 사용 분포</Text>
+      <View style={styles.muscleToggle}>
+        <TouchableOpacity 
+          style={[styles.muscleToggleBtn, showFront && styles.muscleToggleActive]} 
+          onPress={() => setShowFront(true)}
+        >
+          <Text style={styles.muscleToggleText}>전면</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.muscleToggleBtn, !showFront && styles.muscleToggleActive]} 
+          onPress={() => setShowFront(false)}
+        >
+          <Text style={styles.muscleToggleText}>후면</Text>
+        </TouchableOpacity>
+      </View>
+      <MuscleVisualization muscleData={muscleData} showFront={showFront} />
+    </ScrollView>
   )
 }
 
@@ -104,4 +168,8 @@ const styles = StyleSheet.create({
   toggleText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   sectionTitle: { color: '#ff7f27', fontSize: 18, fontWeight: 'bold', marginTop: 24, marginBottom: 8 },
   totalText: { fontSize: 24, fontWeight: 'bold', marginBottom: 12 },
+  muscleToggle: { flexDirection: 'row', marginBottom: 16, justifyContent: 'center' },
+  muscleToggleBtn: { paddingHorizontal: 24, paddingVertical: 8, borderWidth: 1, borderColor: '#ff7f27' },
+  muscleToggleActive: { backgroundColor: '#ff7f27' },
+  muscleToggleText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 })

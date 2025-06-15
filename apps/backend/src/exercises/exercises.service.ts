@@ -105,7 +105,7 @@ export class ExercisesService {
     const cached = await this.cacheManager.get<Exercise>(cacheKey);
     
     if (cached) {
-      return cached;
+      return this.transformExercise(cached);
     }
 
     const exercise = await this.exerciseRepo.findOne({ where: { id } });
@@ -115,7 +115,7 @@ export class ExercisesService {
     }
     
     await this.cacheManager.set(cacheKey, exercise, this.cacheTTL);
-    return exercise;
+    return this.transformExercise(exercise);
   }
 
   async findAll(filters?: ExerciseFiltersDto) {
@@ -161,7 +161,7 @@ export class ExercisesService {
       const [exercises, total] = await query.getManyAndCount();
       
       const result = {
-        exercises,
+        exercises: exercises.map(e => this.transformExercise(e)),
         pagination: {
           page: filters.page,
           limit: filters.limit,
@@ -175,10 +175,11 @@ export class ExercisesService {
     }
 
     const result = await query.getMany();
+    const transformed = result.map(e => this.transformExercise(e));
     if (!filters) {
-      await this.cacheManager.set(cacheKey, result, this.cacheTTL);
+      await this.cacheManager.set(cacheKey, transformed, this.cacheTTL);
     }
-    return result;
+    return transformed;
   }
 
   async getLastRecords(userId: number, exerciseId: number, limit = 5) {
@@ -189,6 +190,7 @@ export class ExercisesService {
       .where('exercise.id = :exerciseId', { exerciseId })
       .andWhere('session.user_id = :userId', { userId })
       .select([
+        'set.id as id',
         'session.date as date',
         'set.set_number as set_number',
         'set.reps as reps',
@@ -200,27 +202,16 @@ export class ExercisesService {
       .limit(limit * 5)
       .getRawMany();
 
-    const groupedByDate = records.reduce((acc, record) => {
-      if (!acc[record.date]) {
-        acc[record.date] = [];
-      }
-      acc[record.date].push({
-        setNumber: record.set_number,
-        reps: record.reps,
-        weight: record.weight,
-        volume: record.volume
-      });
-      return acc;
-    }, {});
+    // Return just the sets for frontend compatibility
+    const sets = records.slice(0, limit).map(record => ({
+      id: record.id,
+      exerciseId: exerciseId,
+      weight: record.weight,
+      reps: record.reps,
+      completed: true
+    }));
 
-    const result = Object.entries(groupedByDate)
-      .slice(0, limit)
-      .map(([date, sets]) => ({
-        date,
-        sets
-      }));
-
-    return result;
+    return { sets };
   }
 
   async calculatePlates(
@@ -378,5 +369,22 @@ export class ExercisesService {
   private async invalidateCache() {
     await this.cacheManager.del('exercises:all');
     await this.cacheManager.del('exercises:{}');
+  }
+
+  private transformExercise(exercise: Exercise) {
+    return {
+      id: exercise.id,
+      name: exercise.name,
+      category: exercise.category,
+      muscle: exercise.category, // Frontend expects 'muscle' field
+      type: exercise.modality, // Frontend expects 'type' field  
+      modality: exercise.modality,
+      difficulty: exercise.difficulty,
+      youtubeUrl: exercise.videoUrl, // Frontend expects 'youtubeUrl'
+      videoUrl: exercise.videoUrl,
+      imageUrl: exercise.imageUrl,
+      createdAt: exercise.createdAt,
+      updatedAt: exercise.updatedAt,
+    };
   }
 }

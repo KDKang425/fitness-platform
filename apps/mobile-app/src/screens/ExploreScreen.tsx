@@ -80,7 +80,7 @@ export default function ExploreScreen({ navigation }: { navigation: any }) {
           onPress={() => setSortBy('popular')}
         >
           <Text style={[styles.sortText, sortBy === 'popular' && styles.sortTextActive]}>
-            인기순
+            구독자 많은 순
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -88,7 +88,7 @@ export default function ExploreScreen({ navigation }: { navigation: any }) {
           onPress={() => setSortBy('trending')}
         >
           <Text style={[styles.sortText, sortBy === 'trending' && styles.sortTextActive]}>
-            트렌드
+            트렌드 (3개월)
           </Text>
         </TouchableOpacity>
       </View>
