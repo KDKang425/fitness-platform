@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useContext } from 'react'
 import {
   View,
   Text,
@@ -13,15 +13,18 @@ import { HomeStackParamList } from '../types/navigation'
 import { Exercise, WorkoutSet } from '../types'
 import api from '../utils/api'
 import { showToast } from '../utils/Toast'
+import { AuthContext } from '../contexts/AuthContext'
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'ExerciseDetail'>
 
 export default function ExerciseDetailScreen({ route }: Props) {
   const { exerciseId } = route.params
+  const { user } = useContext(AuthContext)
   const [loading, setLoading] = useState(true)
   const [exercise, setExercise] = useState<Exercise | null>(null)
   const [recentSets, setRecentSets] = useState<WorkoutSet[]>([])
   const [oneRM, setOneRM] = useState<number | null>(null)
+  const [isProfile1RM, setIsProfile1RM] = useState(false)
 
   useEffect(() => {
     fetchExerciseDetail()
@@ -35,17 +38,41 @@ export default function ExerciseDetailScreen({ route }: Props) {
         api.get(`/exercises/${exerciseId}/history?limit=5`)
       ])
       
-      setExercise(exerciseRes.data)
-      setRecentSets(historyRes.data.sets || [])
+      const exerciseData = exerciseRes.data.data || exerciseRes.data
+      setExercise(exerciseData)
+      setRecentSets(historyRes.data.data?.sets || historyRes.data.sets || [])
       
-      // 1RM 계산 (간단한 공식 사용)
-      if (historyRes.data.sets?.length > 0) {
-        const bestSet = historyRes.data.sets.reduce((best: WorkoutSet, current: WorkoutSet) => {
-          const currentRM = calculate1RM(current.weight, current.reps)
-          const bestRM = calculate1RM(best.weight, best.reps)
-          return currentRM > bestRM ? current : best
-        })
-        setOneRM(calculate1RM(bestSet.weight, bestSet.reps))
+      // Check if this is a major lift and user has profile 1RM
+      const exerciseName = exerciseData.name?.toLowerCase()
+      let profile1RM = null
+      
+      if (user) {
+        if (exerciseName?.includes('bench') || exerciseName?.includes('벤치')) {
+          profile1RM = user.benchPress1RM
+        } else if (exerciseName?.includes('squat') || exerciseName?.includes('스쿼트')) {
+          profile1RM = user.squat1RM
+        } else if (exerciseName?.includes('deadlift') || exerciseName?.includes('데드')) {
+          profile1RM = user.deadlift1RM
+        } else if (exerciseName?.includes('overhead') || exerciseName?.includes('오버헤드') || exerciseName?.includes('ohp')) {
+          profile1RM = user.overheadPress1RM
+        }
+      }
+      
+      if (profile1RM) {
+        setOneRM(profile1RM)
+        setIsProfile1RM(true)
+      } else {
+        // Calculate 1RM from recent sets
+        const sets = historyRes.data.data?.sets || historyRes.data.sets || []
+        if (sets.length > 0) {
+          const bestSet = sets.reduce((best: WorkoutSet, current: WorkoutSet) => {
+            const currentRM = calculate1RM(current.weight, current.reps)
+            const bestRM = calculate1RM(best.weight, best.reps)
+            return currentRM > bestRM ? current : best
+          })
+          setOneRM(calculate1RM(bestSet.weight, bestSet.reps))
+          setIsProfile1RM(false)
+        }
       }
     } catch (error) {
       showToast('운동 정보를 불러오는데 실패했습니다.')
@@ -97,11 +124,16 @@ export default function ExerciseDetailScreen({ route }: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* 1RM 정보 (주요 바벨 운동) */}
-      {oneRM && exercise.type === 'BARBELL' && (
+      {/* 1RM 정보 (주요 운동) */}
+      {oneRM && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>추정 1RM</Text>
+          <Text style={styles.sectionTitle}>
+            {isProfile1RM ? '프로필 1RM' : '추정 1RM'}
+          </Text>
           <Text style={styles.oneRM}>{oneRM} kg</Text>
+          {!isProfile1RM && (
+            <Text style={styles.oneRMNote}>최근 기록을 기반으로 계산됨</Text>
+          )}
         </View>
       )}
 
@@ -182,6 +214,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  oneRMNote: {
+    color: '#888',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
   },
   setRow: {
     flexDirection: 'row',

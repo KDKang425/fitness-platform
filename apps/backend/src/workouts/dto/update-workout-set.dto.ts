@@ -1,4 +1,4 @@
-import { IsOptional, IsInt, IsPositive, Min } from 'class-validator';
+import { IsOptional, IsInt, IsPositive, Min, IsBoolean } from 'class-validator';
 
 export class UpdateWorkoutSetDto {
   @IsOptional()
@@ -9,4 +9,8 @@ export class UpdateWorkoutSetDto {
   @IsOptional()
   @IsPositive()
   weight?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isCompleted?: boolean;
 }

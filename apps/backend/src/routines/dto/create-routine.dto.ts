@@ -86,6 +86,18 @@ export class CreateRoutineDto {
   @Expose({ name: 'is_public' })
   isPublic?: boolean = true;
 
+  @ApiPropertyOptional({ 
+    description: '루틴 기간 (주)', 
+    example: 8,
+    minimum: 1,
+    maximum: 52
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(52)
+  weeks?: number;
+
   @ApiProperty({ 
     description: '운동 목록', 
     type: [ExerciseItemDto],

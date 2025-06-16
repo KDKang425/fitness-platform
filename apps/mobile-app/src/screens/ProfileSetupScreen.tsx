@@ -49,6 +49,29 @@ export default function ProfileSetupScreen({ navigation }: { navigation: any }) 
         return
       }
       
+      // Upload profile image first if selected
+      let profileImageUrl = null
+      if (profileImage) {
+        const formData = new FormData()
+        formData.append('file', {
+          uri: profileImage,
+          type: 'image/jpeg',
+          name: 'profile.jpg',
+        } as any)
+        
+        try {
+          const uploadResponse = await api.post('/upload/profile-image', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          })
+          profileImageUrl = uploadResponse.data.data.url
+        } catch (uploadError) {
+          console.error('Profile image upload failed:', uploadError)
+          // Continue without profile image if upload fails
+        }
+      }
+      
       const payload: any = {
         height: Number(height),
         weight: Number(weight),
@@ -60,13 +83,13 @@ export default function ProfileSetupScreen({ navigation }: { navigation: any }) 
       if (squat) payload.squat1RM = Number(squat)
       if (deadlift) payload.deadlift1RM = Number(deadlift)
       if (ohp) payload.overheadPress1RM = Number(ohp)
-      if (profileImage) payload.profileImageUrl = profileImage
+      if (profileImageUrl) payload.profileImageUrl = profileImageUrl
       
       await api.post('/users/profile/initial', payload)
       
       // Update user data with completed setup flag
       if (user && accessToken && refreshToken) {
-        const updatedUser = { ...user, hasCompletedInitialSetup: true }
+        const updatedUser = { ...user, hasCompletedInitialSetup: true, profileImageUrl }
         await login(accessToken, refreshToken, updatedUser)
       }
     } catch (error: any) {

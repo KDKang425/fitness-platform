@@ -24,4 +24,7 @@ export class WorkoutSet {
 
   @Column()
   volume: number;
+
+  @Column({ default: false })
+  isCompleted: boolean;
 }

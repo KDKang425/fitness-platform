@@ -23,6 +23,7 @@ interface SetType {
   id: number
   weight: number
   reps: number
+  isCompleted?: boolean
   exercise: {
     id: number
     name: string
@@ -50,14 +51,15 @@ interface AddSetPayload {
 }
 
 interface Props {
-  route: { params: { sessionId: number } }
+  route: { params: { sessionId: number; routineId?: number; fromRoutine?: boolean } }
   navigation: any 
 }
 
 export default function WorkoutSessionScreen({ route, navigation }: Props) {
-  const { sessionId } = route.params
+  const { sessionId, routineId, fromRoutine } = route.params
   const [session, setSession]   = useState<Session | null>(null)
   const [sets, setSets]         = useState<SetType[]>([])
+  const [plannedExercises, setPlannedExercises] = useState<any[]>([])
   const [editTarget, setEditTarget] = useState<SetType | null>(null)
   const [showExercisePicker, setShowExercisePicker] = useState(false)
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
@@ -80,9 +82,33 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
         const sessionData = result.data.data || result.data
         setSession(sessionData)
         setSets(sessionData.workoutSets ?? [])
+        
+        // If this is from a routine, load the routine exercises
+        if (fromRoutine && routineId) {
+          loadRoutineExercises(routineId)
+        }
       }
     })()
-  }, [sessionId, navigation, execute])
+  }, [sessionId, navigation, execute, fromRoutine, routineId])
+  
+  const loadRoutineExercises = async (routineId: number) => {
+    try {
+      const response = await api.get(`/routines/${routineId}`)
+      const routine = response.data.data || response.data
+      if (routine.routineExercises) {
+        setPlannedExercises(routine.routineExercises.map((re: any) => ({
+          exerciseId: re.exercise.id,
+          exerciseName: re.exercise.name,
+          defaultSets: re.defaultSets || 3,
+          defaultReps: re.defaultReps || 10,
+          defaultWeight: re.defaultWeight || 0,
+          order: re.exerciseOrder
+        })))
+      }
+    } catch (error) {
+      console.error('Failed to load routine exercises:', error)
+    }
+  }
 
   const addSet = useCallback(
     async (payload: AddSetPayload) => {
@@ -133,6 +159,26 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
       setEditTarget(null)
     },
     [editTarget, execute],
+  )
+  
+  const toggleSetCompletion = useCallback(
+    async (setId: number) => {
+      const targetSet = sets.find(s => s.id === setId)
+      if (!targetSet) return
+      
+      const newCompletedState = !targetSet.isCompleted
+      
+      const result = await execute(
+        api.patch(`/workouts/sets/${setId}`, { isCompleted: newCompletedState })
+      )
+      
+      if (result) {
+        setSets(prev => prev.map(set =>
+          set.id === setId ? { ...set, isCompleted: newCompletedState } : set
+        ))
+      }
+    },
+    [sets, execute],
   )
 
   const finishSession = async () => {
@@ -212,34 +258,53 @@ export default function WorkoutSessionScreen({ route, navigation }: Props) {
       )}
 
       <FlatList
-        data={exerciseGroups}
+        data={exerciseGroups.length > 0 ? exerciseGroups : plannedExercises}
         keyExtractor={item => String(item.exerciseId)}
-        renderItem={({ item: group }) => (
-          <View style={styles.exerciseGroup}>
-            <Text style={styles.exerciseName}>{group.exerciseName}</Text>
-            {group.sets.map((set, index) => (
-              <TouchableOpacity
-                key={set.id}
-                onLongPress={() => setEditTarget(set)}
-              >
-                <SetRow
-                  index={index + 1}
-                  weight={set.weight}
-                  reps={set.reps}
+        renderItem={({ item }) => {
+          const isPlanned = !item.sets
+          const group = isPlanned ? null : item
+          const completedSets = group ? group.sets : sets.filter(s => s.exercise.id === item.exerciseId)
+          
+          return (
+            <View style={styles.exerciseGroup}>
+              <Text style={styles.exerciseName}>{isPlanned ? item.exerciseName : group.exerciseName}</Text>
+              
+              {/* Show planned info if this is from routine */}
+              {isPlanned && (
+                <Text style={styles.plannedInfo}>
+                  계획: {item.defaultSets}세트 × {item.defaultReps}회 @ {item.defaultWeight}kg
+                </Text>
+              )}
+              
+              {/* Show completed sets */}
+              {completedSets.map((set, index) => (
+                <TouchableOpacity
+                  key={set.id}
                   onLongPress={() => setEditTarget(set)}
-                />
+                >
+                  <SetRow
+                    index={index + 1}
+                    weight={set.weight}
+                    reps={set.reps}
+                    isCompleted={set.isCompleted}
+                    onLongPress={() => setEditTarget(set)}
+                    onToggleComplete={() => toggleSetCompletion(set.id)}
+                  />
+                </TouchableOpacity>
+              ))}
+              
+              {/* Add set button */}
+              <TouchableOpacity
+                style={styles.addSetButton}
+                onPress={() => {
+                  setSelectedExerciseId(item.exerciseId)
+                }}
+              >
+                <Text style={styles.addSetText}>+ 세트 추가</Text>
               </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={styles.addSetButton}
-              onPress={() => {
-                setSelectedExerciseId(group.exerciseId)
-              }}
-            >
-              <Text style={styles.addSetText}>+ 세트 추가</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+            </View>
+          )
+        }}
         ListEmptyComponent={
           <Text style={styles.emptyText}>운동을 추가하여 시작하세요</Text>
         }
@@ -307,6 +372,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
+  },
+  plannedInfo: {
+    color: '#888',
+    fontSize: 14,
+    marginBottom: 8,
   },
   addSetButton: {
     padding: 8,

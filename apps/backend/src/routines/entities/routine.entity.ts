@@ -25,6 +25,9 @@ export class Routine {
   @Column({ default: true })
   isPublic: boolean;
 
+  @Column({ nullable: true })
+  weeks?: number;
+
   @OneToMany(() => WorkoutSession, (session) => session.routine)
   workoutSessions: WorkoutSession[];
 
