@@ -13,7 +13,15 @@ import Loader from '../components/Loader'
 import { showToast } from '../utils/Toast'
 import { usePagination, ListFooter } from '../hooks/usePagination'
 
-type Routine = { id: string; title: string; subscribers: number; weeks: number }
+type Routine = { 
+  id: number; 
+  name: string; 
+  description?: string; 
+  isPublic: boolean;
+  creator?: { id: number; nickname: string };
+  subscriberCount?: number;
+  weeks?: number;
+}
 
 export default function ExploreScreen({ navigation }: { navigation: any }) {
   const [sortBy, setSortBy] = useState<'popular' | 'trending'>('popular')
@@ -24,21 +32,10 @@ export default function ExploreScreen({ navigation }: { navigation: any }) {
         params: { sort: sortBy, page, limit }
       })
       
-      // 백엔드가 페이지네이션을 지원하지 않으면 전체 데이터를 반환
-      if (Array.isArray(data)) {
-        const start = (page - 1) * limit
-        const end = start + limit
-        const paginatedData = data.slice(start, end)
-        return {
-          data: paginatedData,
-          hasMore: end < data.length
-        }
-      }
-      
-      // 백엔드가 페이지네이션 지원
+      // 백엔드 응답 구조에 맞게 처리
       return {
-        data: data.items || data,
-        hasMore: data.hasMore || false
+        data: data.routines || [],
+        hasMore: data.pagination ? page < data.pagination.totalPages : false
       }
     } catch (error) {
       throw error
@@ -64,10 +61,19 @@ export default function ExploreScreen({ navigation }: { navigation: any }) {
       style={styles.item}
       onPress={() => navigation.navigate('RoutineDetail', { id: item.id })}
     >
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.sub}>
-        {item.weeks}주 · 구독 {item.subscribers}
-      </Text>
+      <View>
+        <Text style={styles.title}>{item.name}</Text>
+        <Text style={styles.sub}>
+          {item.creator?.nickname || 'Unknown'}
+          {item.weeks && ` · ${item.weeks}주`}
+          {item.subscriberCount !== undefined && ` · 구독 ${item.subscriberCount}`}
+        </Text>
+        {item.description && (
+          <Text style={styles.description} numberOfLines={2}>
+            {item.description}
+          </Text>
+        )}
+      </View>
     </TouchableOpacity>
   )
 
@@ -153,6 +159,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: { color: '#ff7f27', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
-  sub: { color: '#fff', fontSize: 14 },
+  sub: { color: '#888', fontSize: 14, marginBottom: 4 },
+  description: { color: '#fff', fontSize: 14, opacity: 0.8 },
   empty: { color: '#666', textAlign: 'center', marginTop: 24 },
 })

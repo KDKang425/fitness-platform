@@ -106,10 +106,22 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: configService.get('CORS_ORIGIN', ['http://localhost:3000']),
+    origin: (origin, callback) => {
+      // 개발 환경에서는 모든 origin 허용
+      if (configService.get('NODE_ENV') === 'development') {
+        callback(null, true);
+      } else {
+        const allowedOrigins = configService.get('CORS_ORIGIN', '').split(',');
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     maxAge: 86400,
   });
 
@@ -151,8 +163,9 @@ async function bootstrap() {
   });
 
   const port = configService.get<number>('port', 3001);
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');  // 모든 네트워크 인터페이스에서 수신
   console.log(`🚀 Server is running on http://localhost:${port}`);
+  console.log(`🚀 Server is accessible from network at http://0.0.0.0:${port}`);
   console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
 }
 

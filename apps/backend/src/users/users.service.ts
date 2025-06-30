@@ -278,6 +278,29 @@ export class UsersService {
 
     Object.assign(user, dto);
     const updated = await this.userRepo.save(user);
+
+    // Create body record if weight was updated
+    if (dto.weight) {
+      const bodyRecordRepo = this.dataSource.getRepository(BodyRecord);
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if there's already a record for today
+      const existingRecord = await bodyRecordRepo.findOne({
+        where: { user: { id: userId }, date: today }
+      });
+      
+      if (existingRecord) {
+        existingRecord.weight = dto.weight;
+        await bodyRecordRepo.save(existingRecord);
+      } else {
+        await bodyRecordRepo.save({
+          user: { id: userId },
+          weight: dto.weight,
+          date: today,
+        });
+      }
+    }
+
     const { password, ...result } = updated;
     return result;
   }

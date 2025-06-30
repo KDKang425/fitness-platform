@@ -2,12 +2,15 @@ export interface User {
   id: number
   email: string
   nickname: string
-  profileImage?: string
+  profileImageUrl?: string
   height?: number
   weight?: number
   benchPress1RM?: number
   squat1RM?: number
   deadlift1RM?: number
+  overheadPress1RM?: number
+  hasCompletedInitialSetup?: boolean
+  unitPreference?: 'kg' | 'lbs'
 }
 
 export interface Exercise {

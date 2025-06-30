@@ -23,9 +23,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   const handleSaveProfile = async () => {
     try {
-      await api.patch('/users/profile', {
+      await api.put('/users/profile', {
         height: Number(height),
-        weight: Number(weight)
+        weight: Number(weight),
+        unitPreference: isKg ? 'kg' : 'lbs'
       })
       showToast('프로필이 업데이트되었습니다.')
     } catch (error) {
@@ -35,7 +36,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   const handleDataSync = async () => {
     try {
-      await api.post('/users/sync')
+      await api.post('/backup/sync')
       showToast('데이터 동기화가 완료되었습니다.')
     } catch (error) {
       showToast('데이터 동기화에 실패했습니다.')
@@ -44,7 +45,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   const handleDataDownload = async () => {
     try {
-      const response = await api.get('/users/export')
+      const response = await api.get('/export/my-data')
       // 실제로는 파일 다운로드 로직 구현 필요
       showToast('데이터 다운로드가 시작되었습니다.')
     } catch (error) {

@@ -53,7 +53,7 @@ import { PushNotificationsModule } from './push-notifications/push-notifications
         password: configService.get('database.password'),
         database: configService.get('database.database'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: false,
+        synchronize: true, // 임시로 true 설정 - 개발 환경에서만 사용
         logging: process.env.NODE_ENV === 'development',
         namingStrategy: new SnakeNamingStrategy(),
         extra: {

@@ -6,6 +6,23 @@ import MuscleVisualization from '../components/MuscleVisualization'
 
 type StatRes = { label: string; value: number }[]
 
+const muscleGroupMap: { [key: string]: string } = {
+  '가슴': 'CHEST',
+  '등': 'BACK',
+  '어깨': 'SHOULDER',
+  '삼두': 'TRICEPS',
+  '이두': 'BICEPS',
+  '전완': 'FOREARM',
+  '복근': 'ABS',
+  '둔근': 'GLUTES',
+  '햄스트링': 'HAMSTRING',
+  '대퇴사두': 'QUADRICEPS',
+  '승모근': 'TRAPS',
+  '종아리': 'CALVES',
+  '다리': 'QUADRICEPS', // fallback for generic "legs"
+  '팔': 'BICEPS', // fallback for generic "arms"
+}
+
 export default function StatsScreen() {
   const [mode, setMode] = useState<'week' | 'month'>('week')
   const [loading, setLoading] = useState(true)
@@ -20,23 +37,6 @@ export default function StatsScreen() {
       const { data } = await api.get(`/stats/${apiPath}`)
       
       // Transform backend response to expected format
-      // Map muscle groups to match visualization component
-      const muscleGroupMap: { [key: string]: string } = {
-        '가슴': 'CHEST',
-        '등': 'BACK',
-        '어깨': 'SHOULDER',
-        '삼두': 'TRICEPS',
-        '이두': 'BICEPS',
-        '전완': 'FOREARM',
-        '복근': 'ABS',
-        '둔근': 'GLUTES',
-        '햄스트링': 'HAMSTRING',
-        '대퇴사두': 'QUADRICEPS',
-        '승모근': 'TRAPS',
-        '종아리': 'CALVES',
-        '다리': 'QUADRICEPS', // fallback for generic "legs"
-        '팔': 'BICEPS', // fallback for generic "arms"
-      }
       
       const transformed: StatRes = [
         { label: '총볼륨', value: data.totalVolume },
@@ -90,22 +90,6 @@ export default function StatsScreen() {
   const diffColor = diff >= 0 ? '#ff7f27' : '#ff3b30'
 
   // Calculate muscle percentages for visualization
-  const muscleGroupMap: { [key: string]: string } = {
-    '가슴': 'CHEST',
-    '등': 'BACK',
-    '어깨': 'SHOULDER',
-    '삼두': 'TRICEPS',
-    '이두': 'BICEPS',
-    '전완': 'FOREARM',
-    '복근': 'ABS',
-    '둔근': 'GLUTES',
-    '햄스트링': 'HAMSTRING',
-    '대퇴사두': 'QUADRICEPS',
-    '승모근': 'TRAPS',
-    '종아리': 'CALVES',
-    '다리': 'QUADRICEPS',
-    '팔': 'BICEPS',
-  }
   
   const muscleData = current.slice(1).map(item => {
     const totalMuscleVolume = current.slice(1).reduce((sum, m) => sum + m.value, 0)

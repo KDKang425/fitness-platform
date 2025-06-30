@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 
 import { Routine } from './entities/routine.entity';
 import { RoutineExercise } from './entities/routine-exercise.entity';
+import { RoutineSubscription } from '../routine-subscriptions/entities/routine-subscription.entity';
 import { CreateRoutineDto } from './dto/create-routine.dto';
 import { UpdateRoutineDto } from './dto/update-routine.dto';
 
@@ -27,6 +28,8 @@ export class RoutinesService {
     private readonly routineRepo: Repository<Routine>,
     @InjectRepository(RoutineExercise)
     private readonly rxRepo: Repository<RoutineExercise>,
+    @InjectRepository(RoutineSubscription)
+    private readonly subscriptionRepo: Repository<RoutineSubscription>,
   ) {}
 
   async createRoutine(userId: number, dto: CreateRoutineDto) {
@@ -134,6 +137,7 @@ export class RoutinesService {
         'r.name',
         'r.description',
         'r.isPublic',
+        'r.weeks',
         'r.createdAt',
         'u.id',
         'u.nickname',
@@ -185,13 +189,62 @@ export class RoutinesService {
     }
 
     const skip = (page - 1) * limit;
+    
+    // For popular and trending sorts, we need to get the raw results to include counts
+    if (sort === 'popular' || sort === 'trending') {
+      const rawResults = await qb
+        .skip(skip)
+        .take(limit)
+        .getRawMany();
+      
+      const total = await qb.getCount();
+      
+      // Transform raw results to include subscriber counts
+      const routines = rawResults.map(raw => ({
+        id: raw.r_id,
+        name: raw.r_name,
+        description: raw.r_description,
+        isPublic: raw.r_isPublic,
+        weeks: raw.r_weeks,
+        createdAt: raw.r_createdAt,
+        creator: raw.u_id ? {
+          id: raw.u_id,
+          nickname: raw.u_nickname
+        } : null,
+        subscriberCount: parseInt(raw.subscriberCount || raw.recentSubscribers || '0')
+      }));
+      
+      return {
+        routines,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+    
+    // For other sorts, use the regular method
     const [routines, total] = await qb
       .skip(skip)
       .take(limit)
       .getManyAndCount();
+    
+    // Add subscriber count for each routine
+    const routinesWithCounts = await Promise.all(
+      routines.map(async (routine) => {
+        const subscriberCount = await this.subscriptionRepo
+          .count({ where: { routine: { id: routine.id } } });
+        return {
+          ...routine,
+          subscriberCount
+        };
+      })
+    );
 
     return {
-      routines,
+      routines: routinesWithCounts,
       pagination: {
         page,
         limit,

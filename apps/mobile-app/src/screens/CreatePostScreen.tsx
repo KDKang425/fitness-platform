@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { SocialStackParamList } from '../types/navigation'
+import * as ImagePicker from 'expo-image-picker'
 import api from '../utils/api'
 import { showToast } from '../utils/Toast'
 
@@ -21,11 +22,17 @@ export default function CreatePostScreen({ navigation }: Props) {
   const [imageUri, setImageUri] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const selectImage = () => {
-    // 실제로는 이미지 피커 라이브러리 사용
-    // 현재는 더미 이미지 사용
-    const dummyImage = `https://picsum.photos/400/400?random=${Date.now()}`
-    setImageUri(dummyImage)
+  const selectImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri)
+    }
   }
 
   const handlePost = async () => {
@@ -36,8 +43,33 @@ export default function CreatePostScreen({ navigation }: Props) {
 
     try {
       setLoading(true)
+      
+      // Upload image first
+      let uploadedImageUrl = imageUri
+      if (!imageUri.startsWith('http')) {
+        const formData = new FormData()
+        formData.append('file', {
+          uri: imageUri,
+          type: 'image/jpeg',
+          name: 'post.jpg',
+        } as any)
+        
+        try {
+          const uploadResponse = await api.post('/upload/image', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          })
+          uploadedImageUrl = uploadResponse.data.url
+        } catch (uploadError) {
+          showToast('이미지 업로드에 실패했습니다.')
+          return
+        }
+      }
+      
+      // Create post with uploaded image URL
       await api.post('/posts', {
-        imageUrl: imageUri,
+        imageUrl: uploadedImageUrl,
         content: caption.trim()
       })
       showToast('게시글이 업로드되었습니다.')

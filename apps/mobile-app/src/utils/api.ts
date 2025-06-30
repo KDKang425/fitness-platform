@@ -6,6 +6,11 @@ import { ErrorHandler } from './errorHandler'
 
 // 환경에 따른 BASE URL 설정
 function getBaseUrl(): string {
+  // 하드코딩된 IP 주소 사용 (임시) - 네트워크에 맞게 수정
+  const hardcodedUrl = 'http://192.168.0.12:3001/api/v1'  // Expo와 같은 네트워크 사용
+  console.log('Using hardcoded API URL:', hardcodedUrl)
+  return hardcodedUrl
+  
   // 환경변수에서 먼저 확인 - React Native에서는 process.env가 동작하지 않으므로 Constants를 사용
   const envUrl = Constants.expoConfig?.extra?.apiUrl || Constants.manifest?.extra?.apiUrl
   if (envUrl) {
@@ -71,7 +76,15 @@ api.interceptors.response.use(
     
     console.error(`❌ API Error: ${error.response?.status || 'Network'} ${original?.url}`, {
       message: error.message,
-      data: error.response?.data
+      data: error.response?.data,
+      code: error.code,
+      stack: error.stack,
+      config: {
+        baseURL: original?.baseURL,
+        url: original?.url,
+        method: original?.method,
+        headers: original?.headers
+      }
     })
 
     // 401 에러 처리 (토큰 갱신)

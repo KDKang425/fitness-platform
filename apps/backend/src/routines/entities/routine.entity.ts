@@ -2,9 +2,9 @@ import {
   Entity, PrimaryGeneratedColumn, Column,
   ManyToOne, CreateDateColumn, UpdateDateColumn, OneToMany,
 } from 'typeorm';
-import { User } from 'src/users/entities/user.entity';
-import { WorkoutSession } from 'src/workouts/entities/workout-session.entity';
-import { RoutineExercise } from 'src/routines/entities/routine-exercise.entity';
+import { User } from '../../users/entities/user.entity';
+import { WorkoutSession } from '../../workouts/entities/workout-session.entity';
+import { RoutineExercise } from './routine-exercise.entity';
 import { RoutineSubscription } from '../../routine-subscriptions/entities/routine-subscription.entity'; // ⬅️ 추가
 
 
